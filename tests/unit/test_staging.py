@@ -14,7 +14,7 @@ from content_fleet.media import MediaStore
 from content_fleet.secrets import Secret
 from content_fleet.services import build_services
 from content_fleet.staging.object_storage import ObjectStorageStager
-from content_fleet.staging.sigv4 import EMPTY_SHA256, encode_key, sign
+from content_fleet.staging.sigv4 import EMPTY_SHA256, encode_key, presign_get, sign
 from content_fleet.store.db import Database
 from tests.conftest import FakeClock, write_secrets
 
@@ -68,6 +68,23 @@ class TestSigV4:
         assert signed["authorization"].endswith(
             "SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;x-amz-storage-class, "
             "Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+        )
+
+    def test_presigned_url_example(self) -> None:
+        url = presign_get(
+            url="https://examplebucket.s3.amazonaws.com/test.txt",
+            access_key=ACCESS_KEY,
+            secret_key=SECRET_KEY,
+            region="us-east-1",
+            when=WHEN,
+            expires=86400,
+        )
+        assert url == (
+            "https://examplebucket.s3.amazonaws.com/test.txt"
+            "?X-Amz-Algorithm=AWS4-HMAC-SHA256"
+            "&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request"
+            "&X-Amz-Date=20130524T000000Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host"
+            "&X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"
         )
 
     def test_keys_are_percent_encoded_but_slashes_kept(self) -> None:
@@ -146,6 +163,21 @@ class TestObjectStorageStager:
         assert bucket.requests[0].url.host == "s3.example.com"
         assert bucket.requests[0].url.path.startswith("/fleet-media/staged/")
 
+    async def test_private_bucket_hands_out_an_expiring_presigned_url(self, store: Any) -> None:
+        media, record, clock = store
+        bucket = Bucket()
+        private = {k: v for k, v in SETTINGS.items() if k != "public_base_url"}
+        async with httpx2.AsyncClient(transport=bucket.transport()) as http:
+            stager = ObjectStorageStager(
+                http, media, clock, private | {"url_ttl_seconds": 600}, CREDENTIALS
+            )
+            url = await stager.stage(record)
+
+        assert url.startswith("https://s3.example.com/fleet-media/staged/")
+        assert "X-Amz-Expires=600" in url and "X-Amz-Signature=" in url
+        assert url.isascii() and SECRET_KEY not in url
+        assert len(bucket.objects) == 1
+
     async def test_unstage_deletes_and_tolerates_missing_objects(self, store: Any) -> None:
         media, record, clock = store
         bucket = Bucket()
@@ -185,6 +217,7 @@ class TestObjectStorageStager:
             {k: v for k, v in SETTINGS.items() if k != "bucket"},
             SETTINGS | {"endpoint": "http://insecure.example.com"},
             SETTINGS | {"typo": 1},
+            SETTINGS | {"url_ttl_seconds": 7 * 86400},
         ],
     )
     async def test_bad_settings_are_rejected(self, store: Any, settings: dict[str, Any]) -> None:
@@ -220,6 +253,7 @@ class TestStagingConfiguration:
             {"strategy": "self-hosted", "settings": {}},
             {"strategy": "self-hosted", "settings": {"public_base_url": "http://plain.example"}},
             {"strategy": "object-storage", "settings": SETTINGS},
+            {"strategy": "self-hosted", "credentials": {"x": "s3_id"}, "settings": {}},
         ],
     )
     def test_misconfigured_staging_stops_startup(

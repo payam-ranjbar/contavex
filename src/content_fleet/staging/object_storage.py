@@ -1,9 +1,14 @@
 """Stage media by pushing it to an S3-compatible bucket (S3, R2, MinIO, B2).
 
-The bucket, or a CDN in front of it, must serve the staging prefix publicly;
-`public_base_url` is that public address. Object keys contain a random
-token, so a URL cannot be guessed, and the object is deleted when the
-publication ends.
+Two ways to hand the vendor a URL:
+
+* Default, private bucket: a presigned GET URL that expires (an hour unless
+  configured). Nothing in the bucket is ever public.
+* `public_base_url` set: the bucket, or a CDN in front of it, serves the
+  staging prefix publicly and the URL is built from that address.
+
+Either way the object key contains an unguessable token and the object is
+deleted when the publication ends.
 """
 
 from __future__ import annotations
@@ -22,10 +27,12 @@ from content_fleet.media import MediaStore
 from content_fleet.secrets import Secret
 from content_fleet.staging import Stager
 from content_fleet.staging.self_hosted import public_name
-from content_fleet.staging.sigv4 import EMPTY_SHA256, encode_key, sign
+from content_fleet.staging.sigv4 import EMPTY_SHA256, encode_key, presign_get, sign
 from content_fleet.store.db import MediaRecord
 
 CHUNK = 1024 * 1024
+DEFAULT_URL_TTL_SECONDS = 3600
+MAX_URL_TTL_SECONDS = 86400  # an Instagram container itself lives 24 hours
 
 
 async def _chunks(path: Path) -> AsyncIterator[bytes]:
@@ -45,8 +52,8 @@ class ObjectStorageStager(Stager):
         settings: dict[str, Any],
         credentials: dict[str, Secret],
     ) -> None:
-        required = {"endpoint", "bucket", "region", "public_base_url"}
-        unknown = set(settings) - required - {"prefix"}
+        required = {"endpoint", "bucket", "region"}
+        unknown = set(settings) - required - {"prefix", "public_base_url", "url_ttl_seconds"}
         missing = required - set(settings)
         if unknown or missing:
             raise ValueError(
@@ -55,12 +62,19 @@ class ObjectStorageStager(Stager):
         if set(credentials) != {"access_key_id", "secret_access_key"}:
             raise ValueError("staging credentials must be access_key_id and secret_access_key")
         for name in ("endpoint", "public_base_url"):
-            if not str(settings[name]).startswith("https://"):
+            if name in settings and not str(settings[name]).startswith("https://"):
                 raise ValueError(f"staging settings.{name} must be an https:// URL")
+        ttl = settings.get("url_ttl_seconds", DEFAULT_URL_TTL_SECONDS)
+        if not isinstance(ttl, int) or not 60 <= ttl <= MAX_URL_TTL_SECONDS:
+            raise ValueError(
+                f"staging settings.url_ttl_seconds must be 60 to {MAX_URL_TTL_SECONDS}"
+            )
+        self._ttl = ttl
         self._endpoint = str(settings["endpoint"]).rstrip("/")
         self._bucket = str(settings["bucket"])
         self._region = str(settings["region"])
-        self._public = str(settings["public_base_url"]).rstrip("/")
+        public = settings.get("public_base_url")
+        self._public = str(public).rstrip("/") if public else None
         self._prefix = str(settings.get("prefix", "staged/")).lstrip("/")
         self._http = http
         self._media = media
@@ -123,7 +137,16 @@ class ObjectStorageStager(Stager):
             media.sha256,
             _chunks(self._media.path(media.id)),
         )
-        return f"{self._public}/{encode_key(key)}"
+        if self._public is not None:
+            return f"{self._public}/{encode_key(key)}"
+        return presign_get(
+            url=f"{self._endpoint}/{self._bucket}/{encode_key(key)}",
+            access_key=self._credentials["access_key_id"].reveal(),
+            secret_key=self._credentials["secret_access_key"].reveal(),
+            region=self._region,
+            when=datetime.fromtimestamp(self._clock(), UTC),
+            expires=self._ttl,
+        )
 
     async def unstage(self, media_id: str) -> None:
         record = self._media.get(media_id)

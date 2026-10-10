@@ -14,7 +14,7 @@ from content_fleet.config import ConfigError, FleetConfig
 from content_fleet.observability import configure_logging
 from content_fleet.providers.registry import default_registry
 from tests.conftest import Harness, HarnessFactory
-from tests.fakes.telegram import CHAT_ID, TOKEN, FakeTelegram
+from tests.fakes.telegram import CHAT_ID, TOKEN, FakeTelegram, check_against_spec
 
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
@@ -562,3 +562,44 @@ async def test_bot_token_never_leaks(
         "database": stored,
     }.items():
         assert secret_part not in text, f"bot token leaked into {where}"
+
+
+async def test_test_environment_uses_telegrams_test_servers(
+    harness_factory: HarnessFactory, telegram: FakeTelegram
+) -> None:
+    telegram.test_environment = True  # the fake now only answers /bot<token>/test/METHOD
+    h = await harness_factory(
+        config=telegram_config(test_environment=True),
+        transport=telegram.transport(),
+        secrets={"telegram_token": TOKEN},
+    )
+    assert (await publish(h, text="to the test servers"))["status"] == "published"
+
+
+class TestRequestsMatchTheBotApi:
+    """Every call in this file is checked against the Bot API field list by
+    the fake. These confirm that the check itself has teeth."""
+
+    def test_known_good_calls_pass(self) -> None:
+        check_against_spec("sendMessage", {"chat_id": 1, "text": "x"}, set())
+        check_against_spec("sendPhoto", {"chat_id": 1, "photo": "attach://photo"}, {"photo"})
+
+    @pytest.mark.parametrize(
+        ("method", "params", "files", "problem"),
+        [
+            ("sendMesage", {"chat_id": 1, "text": "x"}, set(), "not a Bot API"),
+            ("sendMessage", {"chat_id": 1}, set(), "required parameters missing"),
+            (
+                "sendMessage",
+                {"chat_id": 1, "text": "x", "silent": True},
+                set(),
+                "not in the Bot API",
+            ),
+            ("sendPhoto", {"chat_id": 1, "photo": "attach://a"}, {"b"}, "unreferenced uploads"),
+        ],
+    )
+    def test_invalid_calls_are_caught(
+        self, method: str, params: dict[str, Any], files: set[str], problem: str
+    ) -> None:
+        with pytest.raises(AssertionError, match=problem):
+            check_against_spec(method, params, files)

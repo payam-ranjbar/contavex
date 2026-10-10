@@ -73,6 +73,46 @@ def sign(
     return result
 
 
+def presign_get(
+    *,
+    url: str,
+    access_key: str,
+    secret_key: str,
+    region: str,
+    when: datetime,
+    expires: int,
+    service: str = "s3",
+) -> str:
+    """A URL that lets its holder GET one object for `expires` seconds."""
+    parts = urlsplit(url)
+    amz_date = when.astimezone(UTC).strftime("%Y%m%dT%H%M%SZ")
+    date = amz_date[:8]
+    scope = f"{date}/{region}/{service}/aws4_request"
+    query = "&".join(
+        f"{name}={quote(value, safe='-_.~')}"
+        for name, value in sorted(
+            {
+                "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+                "X-Amz-Credential": f"{access_key}/{scope}",
+                "X-Amz-Date": amz_date,
+                "X-Amz-Expires": str(expires),
+                "X-Amz-SignedHeaders": "host",
+            }.items()
+        )
+    )
+    canonical = "\n".join(
+        ["GET", parts.path or "/", query, f"host:{parts.netloc}\n", "host", "UNSIGNED-PAYLOAD"]
+    )
+    to_sign = "\n".join(
+        ["AWS4-HMAC-SHA256", amz_date, scope, hashlib.sha256(canonical.encode()).hexdigest()]
+    )
+    key = _hmac(
+        _hmac(_hmac(_hmac(f"AWS4{secret_key}".encode(), date), region), service), "aws4_request"
+    )
+    signature = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
+    return f"{url}?{query}&X-Amz-Signature={signature}"
+
+
 def encode_key(key: str) -> str:
     """Percent-encode an object key for the URL path, as S3 canonicalises it."""
     return quote(key, safe="/-_.~")

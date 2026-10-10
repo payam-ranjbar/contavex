@@ -1,0 +1,1413 @@
+{
+ "methods": {
+  "addStickerToSet": {
+   "name": true,
+   "sticker": true,
+   "user_id": true
+  },
+  "answerCallbackQuery": {
+   "cache_time": false,
+   "callback_query_id": true,
+   "show_alert": false,
+   "text": false,
+   "url": false
+  },
+  "answerChatJoinRequestQuery": {
+   "chat_join_request_query_id": true,
+   "result": true
+  },
+  "answerGuestQuery": {
+   "guest_query_id": true,
+   "result": true
+  },
+  "answerInlineQuery": {
+   "button": false,
+   "cache_time": false,
+   "inline_query_id": true,
+   "is_personal": false,
+   "next_offset": false,
+   "results": true
+  },
+  "answerPreCheckoutQuery": {
+   "error_message": false,
+   "ok": true,
+   "pre_checkout_query_id": true
+  },
+  "answerShippingQuery": {
+   "error_message": false,
+   "ok": true,
+   "shipping_options": false,
+   "shipping_query_id": true
+  },
+  "answerWebAppQuery": {
+   "result": true,
+   "web_app_query_id": true
+  },
+  "approveChatJoinRequest": {
+   "chat_id": true,
+   "user_id": true
+  },
+  "approveSuggestedPost": {
+   "chat_id": true,
+   "message_id": true,
+   "send_date": false
+  },
+  "banChatMember": {
+   "chat_id": true,
+   "revoke_messages": false,
+   "until_date": false,
+   "user_id": true
+  },
+  "banChatSenderChat": {
+   "chat_id": true,
+   "sender_chat_id": true
+  },
+  "close": {},
+  "closeForumTopic": {
+   "chat_id": true,
+   "message_thread_id": true
+  },
+  "closeGeneralForumTopic": {
+   "chat_id": true
+  },
+  "convertGiftToStars": {
+   "business_connection_id": true,
+   "owned_gift_id": true
+  },
+  "copyMessage": {
+   "allow_paid_broadcast": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "from_chat_id": true,
+   "message_effect_id": false,
+   "message_id": true,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "suggested_post_parameters": false,
+   "video_start_timestamp": false
+  },
+  "copyMessages": {
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "from_chat_id": true,
+   "message_ids": true,
+   "message_thread_id": false,
+   "protect_content": false,
+   "remove_caption": false
+  },
+  "createChatInviteLink": {
+   "chat_id": true,
+   "creates_join_request": false,
+   "expire_date": false,
+   "member_limit": false,
+   "name": false
+  },
+  "createChatSubscriptionInviteLink": {
+   "chat_id": true,
+   "name": false,
+   "subscription_period": true,
+   "subscription_price": true
+  },
+  "createForumTopic": {
+   "chat_id": true,
+   "icon_color": false,
+   "icon_custom_emoji_id": false,
+   "name": true
+  },
+  "createInvoiceLink": {
+   "business_connection_id": false,
+   "currency": true,
+   "description": true,
+   "is_flexible": false,
+   "max_tip_amount": false,
+   "need_email": false,
+   "need_name": false,
+   "need_phone_number": false,
+   "need_shipping_address": false,
+   "payload": true,
+   "photo_height": false,
+   "photo_size": false,
+   "photo_url": false,
+   "photo_width": false,
+   "prices": true,
+   "provider_data": false,
+   "provider_token": false,
+   "send_email_to_provider": false,
+   "send_phone_number_to_provider": false,
+   "subscription_period": false,
+   "suggested_tip_amounts": false,
+   "title": true
+  },
+  "createNewStickerSet": {
+   "name": true,
+   "needs_repainting": false,
+   "sticker_type": false,
+   "stickers": true,
+   "title": true,
+   "user_id": true
+  },
+  "declineChatJoinRequest": {
+   "chat_id": true,
+   "user_id": true
+  },
+  "declineSuggestedPost": {
+   "chat_id": true,
+   "comment": false,
+   "message_id": true
+  },
+  "deleteAllMessageReactions": {
+   "actor_chat_id": false,
+   "chat_id": true,
+   "user_id": false
+  },
+  "deleteBusinessMessages": {
+   "business_connection_id": true,
+   "message_ids": true
+  },
+  "deleteChatPhoto": {
+   "chat_id": true
+  },
+  "deleteChatStickerSet": {
+   "chat_id": true
+  },
+  "deleteEphemeralMessage": {
+   "chat_id": true,
+   "ephemeral_message_id": true,
+   "receiver_user_id": true
+  },
+  "deleteForumTopic": {
+   "chat_id": true,
+   "message_thread_id": true
+  },
+  "deleteMessage": {
+   "chat_id": true,
+   "message_id": true
+  },
+  "deleteMessageReaction": {
+   "actor_chat_id": false,
+   "chat_id": true,
+   "message_id": true,
+   "user_id": false
+  },
+  "deleteMessages": {
+   "chat_id": true,
+   "message_ids": true
+  },
+  "deleteMyCommands": {
+   "language_code": false,
+   "scope": false
+  },
+  "deleteStickerFromSet": {
+   "sticker": true
+  },
+  "deleteStickerSet": {
+   "name": true
+  },
+  "deleteStory": {
+   "business_connection_id": true,
+   "story_id": true
+  },
+  "deleteWebhook": {
+   "drop_pending_updates": false
+  },
+  "editChatInviteLink": {
+   "chat_id": true,
+   "creates_join_request": false,
+   "expire_date": false,
+   "invite_link": true,
+   "member_limit": false,
+   "name": false
+  },
+  "editChatSubscriptionInviteLink": {
+   "chat_id": true,
+   "invite_link": true,
+   "name": false
+  },
+  "editEphemeralMessageCaption": {
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "ephemeral_message_id": true,
+   "parse_mode": false,
+   "receiver_user_id": true,
+   "reply_markup": false,
+   "show_caption_above_media": false
+  },
+  "editEphemeralMessageMedia": {
+   "chat_id": true,
+   "ephemeral_message_id": true,
+   "media": true,
+   "receiver_user_id": true,
+   "reply_markup": false
+  },
+  "editEphemeralMessageReplyMarkup": {
+   "chat_id": true,
+   "ephemeral_message_id": true,
+   "receiver_user_id": true,
+   "reply_markup": false
+  },
+  "editEphemeralMessageText": {
+   "chat_id": true,
+   "entities": false,
+   "ephemeral_message_id": true,
+   "link_preview_options": false,
+   "parse_mode": false,
+   "receiver_user_id": true,
+   "reply_markup": false,
+   "rich_message": false,
+   "text": false
+  },
+  "editForumTopic": {
+   "chat_id": true,
+   "icon_custom_emoji_id": false,
+   "message_thread_id": true,
+   "name": false
+  },
+  "editGeneralForumTopic": {
+   "chat_id": true,
+   "name": true
+  },
+  "editMessageCaption": {
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": false,
+   "inline_message_id": false,
+   "message_id": false,
+   "parse_mode": false,
+   "reply_markup": false,
+   "show_caption_above_media": false
+  },
+  "editMessageChecklist": {
+   "business_connection_id": true,
+   "chat_id": true,
+   "checklist": true,
+   "message_id": true,
+   "reply_markup": false
+  },
+  "editMessageLiveLocation": {
+   "business_connection_id": false,
+   "chat_id": false,
+   "heading": false,
+   "horizontal_accuracy": false,
+   "inline_message_id": false,
+   "latitude": true,
+   "live_period": false,
+   "longitude": true,
+   "message_id": false,
+   "proximity_alert_radius": false,
+   "reply_markup": false
+  },
+  "editMessageMedia": {
+   "business_connection_id": false,
+   "chat_id": false,
+   "inline_message_id": false,
+   "media": true,
+   "message_id": false,
+   "reply_markup": false
+  },
+  "editMessageReplyMarkup": {
+   "business_connection_id": false,
+   "chat_id": false,
+   "inline_message_id": false,
+   "message_id": false,
+   "reply_markup": false
+  },
+  "editMessageText": {
+   "business_connection_id": false,
+   "chat_id": false,
+   "entities": false,
+   "inline_message_id": false,
+   "link_preview_options": false,
+   "message_id": false,
+   "parse_mode": false,
+   "reply_markup": false,
+   "rich_message": false,
+   "text": false
+  },
+  "editStory": {
+   "areas": false,
+   "business_connection_id": true,
+   "caption": false,
+   "caption_entities": false,
+   "content": true,
+   "parse_mode": false,
+   "story_id": true
+  },
+  "editUserStarSubscription": {
+   "is_canceled": true,
+   "telegram_payment_charge_id": true,
+   "user_id": true
+  },
+  "exportChatInviteLink": {
+   "chat_id": true
+  },
+  "forwardMessage": {
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "from_chat_id": true,
+   "message_effect_id": false,
+   "message_id": true,
+   "message_thread_id": false,
+   "protect_content": false,
+   "suggested_post_parameters": false,
+   "video_start_timestamp": false
+  },
+  "forwardMessages": {
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "from_chat_id": true,
+   "message_ids": true,
+   "message_thread_id": false,
+   "protect_content": false
+  },
+  "getAvailableGifts": {},
+  "getBusinessAccountGifts": {
+   "business_connection_id": true,
+   "exclude_from_blockchain": false,
+   "exclude_limited_non_upgradable": false,
+   "exclude_limited_upgradable": false,
+   "exclude_saved": false,
+   "exclude_unique": false,
+   "exclude_unlimited": false,
+   "exclude_unsaved": false,
+   "limit": false,
+   "offset": false,
+   "sort_by_price": false
+  },
+  "getBusinessAccountStarBalance": {
+   "business_connection_id": true
+  },
+  "getBusinessConnection": {
+   "business_connection_id": true
+  },
+  "getChat": {
+   "chat_id": true
+  },
+  "getChatAdministrators": {
+   "chat_id": true,
+   "return_bots": false
+  },
+  "getChatGifts": {
+   "chat_id": true,
+   "exclude_from_blockchain": false,
+   "exclude_limited_non_upgradable": false,
+   "exclude_limited_upgradable": false,
+   "exclude_saved": false,
+   "exclude_unique": false,
+   "exclude_unlimited": false,
+   "exclude_unsaved": false,
+   "limit": false,
+   "offset": false,
+   "sort_by_price": false
+  },
+  "getChatMember": {
+   "chat_id": true,
+   "user_id": true
+  },
+  "getChatMemberCount": {
+   "chat_id": true
+  },
+  "getChatMenuButton": {
+   "chat_id": false
+  },
+  "getCustomEmojiStickers": {
+   "custom_emoji_ids": true
+  },
+  "getFile": {
+   "file_id": true
+  },
+  "getForumTopicIconStickers": {},
+  "getGameHighScores": {
+   "chat_id": false,
+   "inline_message_id": false,
+   "message_id": false,
+   "user_id": true
+  },
+  "getManagedBotAccessSettings": {
+   "user_id": true
+  },
+  "getManagedBotToken": {
+   "user_id": true
+  },
+  "getMe": {},
+  "getMyCommands": {
+   "language_code": false,
+   "scope": false
+  },
+  "getMyDefaultAdministratorRights": {
+   "for_channels": false
+  },
+  "getMyDescription": {
+   "language_code": false
+  },
+  "getMyName": {
+   "language_code": false
+  },
+  "getMyShortDescription": {
+   "language_code": false
+  },
+  "getMyStarBalance": {},
+  "getStarTransactions": {
+   "limit": false,
+   "offset": false
+  },
+  "getStickerSet": {
+   "name": true
+  },
+  "getUpdates": {
+   "allowed_updates": false,
+   "limit": false,
+   "offset": false,
+   "timeout": false
+  },
+  "getUserChatBoosts": {
+   "chat_id": true,
+   "user_id": true
+  },
+  "getUserGifts": {
+   "exclude_from_blockchain": false,
+   "exclude_limited_non_upgradable": false,
+   "exclude_limited_upgradable": false,
+   "exclude_unique": false,
+   "exclude_unlimited": false,
+   "limit": false,
+   "offset": false,
+   "sort_by_price": false,
+   "user_id": true
+  },
+  "getUserPersonalChatMessages": {
+   "limit": true,
+   "user_id": true
+  },
+  "getUserProfileAudios": {
+   "limit": false,
+   "offset": false,
+   "user_id": true
+  },
+  "getUserProfilePhotos": {
+   "limit": false,
+   "offset": false,
+   "user_id": true
+  },
+  "getWebhookInfo": {},
+  "giftPremiumSubscription": {
+   "month_count": true,
+   "star_count": true,
+   "text": false,
+   "text_entities": false,
+   "text_parse_mode": false,
+   "user_id": true
+  },
+  "hideGeneralForumTopic": {
+   "chat_id": true
+  },
+  "leaveChat": {
+   "chat_id": true
+  },
+  "logOut": {},
+  "pinChatMessage": {
+   "business_connection_id": false,
+   "chat_id": true,
+   "disable_notification": false,
+   "message_id": true
+  },
+  "postStory": {
+   "active_period": true,
+   "areas": false,
+   "business_connection_id": true,
+   "caption": false,
+   "caption_entities": false,
+   "content": true,
+   "parse_mode": false,
+   "post_to_chat_page": false,
+   "protect_content": false
+  },
+  "promoteChatMember": {
+   "can_change_info": false,
+   "can_delete_messages": false,
+   "can_delete_stories": false,
+   "can_edit_messages": false,
+   "can_edit_stories": false,
+   "can_invite_users": false,
+   "can_manage_chat": false,
+   "can_manage_direct_messages": false,
+   "can_manage_tags": false,
+   "can_manage_topics": false,
+   "can_manage_video_chats": false,
+   "can_pin_messages": false,
+   "can_post_messages": false,
+   "can_post_stories": false,
+   "can_promote_members": false,
+   "can_restrict_members": false,
+   "can_send_welcome_messages": false,
+   "chat_id": true,
+   "is_anonymous": false,
+   "user_id": true
+  },
+  "readBusinessMessage": {
+   "business_connection_id": true,
+   "chat_id": true,
+   "message_id": true
+  },
+  "refundStarPayment": {
+   "telegram_payment_charge_id": true,
+   "user_id": true
+  },
+  "removeBusinessAccountProfilePhoto": {
+   "business_connection_id": true,
+   "is_public": false
+  },
+  "removeChatVerification": {
+   "chat_id": true
+  },
+  "removeMyProfilePhoto": {},
+  "removeUserVerification": {
+   "user_id": true
+  },
+  "reopenForumTopic": {
+   "chat_id": true,
+   "message_thread_id": true
+  },
+  "reopenGeneralForumTopic": {
+   "chat_id": true
+  },
+  "replaceManagedBotToken": {
+   "user_id": true
+  },
+  "replaceStickerInSet": {
+   "name": true,
+   "old_sticker": true,
+   "sticker": true,
+   "user_id": true
+  },
+  "repostStory": {
+   "active_period": true,
+   "business_connection_id": true,
+   "from_chat_id": true,
+   "from_story_id": true,
+   "post_to_chat_page": false,
+   "protect_content": false
+  },
+  "restrictChatMember": {
+   "chat_id": true,
+   "permissions": true,
+   "until_date": false,
+   "use_independent_chat_permissions": false,
+   "user_id": true
+  },
+  "revokeChatInviteLink": {
+   "chat_id": true,
+   "invite_link": true
+  },
+  "savePreparedInlineMessage": {
+   "allow_bot_chats": false,
+   "allow_channel_chats": false,
+   "allow_group_chats": false,
+   "allow_user_chats": false,
+   "result": true,
+   "user_id": true
+  },
+  "savePreparedKeyboardButton": {
+   "button": true,
+   "user_id": true
+  },
+  "sendAnimation": {
+   "allow_paid_broadcast": false,
+   "animation": true,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "duration": false,
+   "ephemeral_message_parameters": false,
+   "has_spoiler": false,
+   "height": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "suggested_post_parameters": false,
+   "thumbnail": false,
+   "width": false
+  },
+  "sendAudio": {
+   "allow_paid_broadcast": false,
+   "audio": true,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "duration": false,
+   "ephemeral_message_parameters": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "performer": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "thumbnail": false,
+   "title": false
+  },
+  "sendChatAction": {
+   "action": true,
+   "business_connection_id": false,
+   "chat_id": true,
+   "message_thread_id": false
+  },
+  "sendChatJoinRequestWebApp": {
+   "chat_join_request_query_id": true,
+   "web_app_url": true
+  },
+  "sendChecklist": {
+   "business_connection_id": true,
+   "chat_id": true,
+   "checklist": true,
+   "disable_notification": false,
+   "message_effect_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false
+  },
+  "sendContact": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "first_name": true,
+   "last_name": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "phone_number": true,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "vcard": false
+  },
+  "sendDice": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "emoji": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false
+  },
+  "sendDocument": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_content_type_detection": false,
+   "disable_notification": false,
+   "document": true,
+   "ephemeral_message_parameters": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "thumbnail": false
+  },
+  "sendGame": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "disable_notification": false,
+   "game_short_name": true,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false
+  },
+  "sendGift": {
+   "chat_id": false,
+   "gift_id": true,
+   "pay_for_upgrade": false,
+   "text": false,
+   "text_entities": false,
+   "text_parse_mode": false,
+   "user_id": false
+  },
+  "sendInvoice": {
+   "allow_paid_broadcast": false,
+   "chat_id": true,
+   "currency": true,
+   "description": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "is_flexible": false,
+   "max_tip_amount": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "need_email": false,
+   "need_name": false,
+   "need_phone_number": false,
+   "need_shipping_address": false,
+   "payload": true,
+   "photo_height": false,
+   "photo_size": false,
+   "photo_url": false,
+   "photo_width": false,
+   "prices": true,
+   "protect_content": false,
+   "provider_data": false,
+   "provider_token": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "send_email_to_provider": false,
+   "send_phone_number_to_provider": false,
+   "start_parameter": false,
+   "suggested_post_parameters": false,
+   "suggested_tip_amounts": false,
+   "title": true
+  },
+  "sendLivePhoto": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "has_spoiler": false,
+   "live_photo": true,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "photo": true,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "suggested_post_parameters": false
+  },
+  "sendLocation": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "heading": false,
+   "horizontal_accuracy": false,
+   "latitude": true,
+   "live_period": false,
+   "longitude": true,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "proximity_alert_radius": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false
+  },
+  "sendMediaGroup": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "media": true,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_parameters": false
+  },
+  "sendMessage": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "entities": false,
+   "ephemeral_message_parameters": false,
+   "link_preview_options": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "text": true
+  },
+  "sendMessageDraft": {
+   "can_stop": false,
+   "chat_id": true,
+   "draft_id": true,
+   "entities": false,
+   "keep_on_stop": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "text": false
+  },
+  "sendPaidMedia": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "media": true,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "payload": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "star_count": true,
+   "suggested_post_parameters": false
+  },
+  "sendPhoto": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "has_spoiler": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "photo": true,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "suggested_post_parameters": false
+  },
+  "sendPoll": {
+   "allow_adding_options": false,
+   "allow_paid_broadcast": false,
+   "allows_multiple_answers": false,
+   "allows_revoting": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "close_date": false,
+   "correct_option_ids": false,
+   "country_codes": false,
+   "description": false,
+   "description_entities": false,
+   "description_parse_mode": false,
+   "disable_notification": false,
+   "explanation": false,
+   "explanation_entities": false,
+   "explanation_media": false,
+   "explanation_parse_mode": false,
+   "hide_results_until_closes": false,
+   "is_anonymous": false,
+   "is_closed": false,
+   "media": false,
+   "members_only": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "open_period": false,
+   "options": true,
+   "protect_content": false,
+   "question": true,
+   "question_entities": false,
+   "question_parse_mode": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "shuffle_options": false,
+   "type": false
+  },
+  "sendRichMessage": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "rich_message": true,
+   "suggested_post_parameters": false
+  },
+  "sendRichMessageDraft": {
+   "can_stop": false,
+   "chat_id": true,
+   "draft_id": true,
+   "keep_on_stop": false,
+   "message_thread_id": false,
+   "rich_message": true
+  },
+  "sendSticker": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "emoji": false,
+   "ephemeral_message_parameters": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "sticker": true,
+   "suggested_post_parameters": false
+  },
+  "sendVenue": {
+   "address": true,
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "ephemeral_message_parameters": false,
+   "foursquare_id": false,
+   "foursquare_type": false,
+   "google_place_id": false,
+   "google_place_type": false,
+   "latitude": true,
+   "longitude": true,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "title": true
+  },
+  "sendVideo": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "cover": false,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "duration": false,
+   "ephemeral_message_parameters": false,
+   "has_spoiler": false,
+   "height": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "show_caption_above_media": false,
+   "start_timestamp": false,
+   "suggested_post_parameters": false,
+   "supports_streaming": false,
+   "thumbnail": false,
+   "video": true,
+   "width": false
+  },
+  "sendVideoNote": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "duration": false,
+   "ephemeral_message_parameters": false,
+   "length": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "thumbnail": false,
+   "video_note": true
+  },
+  "sendVoice": {
+   "allow_paid_broadcast": false,
+   "business_connection_id": false,
+   "caption": false,
+   "caption_entities": false,
+   "chat_id": true,
+   "direct_messages_topic_id": false,
+   "disable_notification": false,
+   "duration": false,
+   "ephemeral_message_parameters": false,
+   "message_effect_id": false,
+   "message_thread_id": false,
+   "parse_mode": false,
+   "protect_content": false,
+   "reply_markup": false,
+   "reply_parameters": false,
+   "suggested_post_parameters": false,
+   "voice": true
+  },
+  "setBusinessAccountBio": {
+   "bio": false,
+   "business_connection_id": true
+  },
+  "setBusinessAccountGiftSettings": {
+   "accepted_gift_types": true,
+   "business_connection_id": true,
+   "show_gift_button": true
+  },
+  "setBusinessAccountName": {
+   "business_connection_id": true,
+   "first_name": true,
+   "last_name": false
+  },
+  "setBusinessAccountProfilePhoto": {
+   "business_connection_id": true,
+   "is_public": false,
+   "photo": true
+  },
+  "setBusinessAccountUsername": {
+   "business_connection_id": true,
+   "username": false
+  },
+  "setChatAdministratorCustomTitle": {
+   "chat_id": true,
+   "custom_title": true,
+   "user_id": true
+  },
+  "setChatDescription": {
+   "chat_id": true,
+   "description": false
+  },
+  "setChatMemberTag": {
+   "chat_id": true,
+   "tag": false,
+   "user_id": true
+  },
+  "setChatMenuButton": {
+   "chat_id": false,
+   "menu_button": false
+  },
+  "setChatPermissions": {
+   "chat_id": true,
+   "permissions": true,
+   "use_independent_chat_permissions": false
+  },
+  "setChatPhoto": {
+   "chat_id": true,
+   "photo": true
+  },
+  "setChatStickerSet": {
+   "chat_id": true,
+   "sticker_set_name": true
+  },
+  "setChatTitle": {
+   "chat_id": true,
+   "title": true
+  },
+  "setCustomEmojiStickerSetThumbnail": {
+   "custom_emoji_id": false,
+   "name": true
+  },
+  "setGameScore": {
+   "chat_id": false,
+   "disable_edit_message": false,
+   "force": false,
+   "inline_message_id": false,
+   "message_id": false,
+   "score": true,
+   "user_id": true
+  },
+  "setManagedBotAccessSettings": {
+   "added_user_ids": false,
+   "is_access_restricted": true,
+   "user_id": true
+  },
+  "setMessageReaction": {
+   "chat_id": true,
+   "is_big": false,
+   "message_id": true,
+   "reaction": false
+  },
+  "setMyCommands": {
+   "commands": true,
+   "language_code": false,
+   "scope": false
+  },
+  "setMyDefaultAdministratorRights": {
+   "for_channels": false,
+   "rights": false
+  },
+  "setMyDescription": {
+   "description": false,
+   "language_code": false
+  },
+  "setMyName": {
+   "language_code": false,
+   "name": false
+  },
+  "setMyProfilePhoto": {
+   "photo": true
+  },
+  "setMyShortDescription": {
+   "language_code": false,
+   "short_description": false
+  },
+  "setPassportDataErrors": {
+   "errors": true,
+   "user_id": true
+  },
+  "setStickerEmojiList": {
+   "emoji_list": true,
+   "sticker": true
+  },
+  "setStickerKeywords": {
+   "keywords": false,
+   "sticker": true
+  },
+  "setStickerMaskPosition": {
+   "mask_position": false,
+   "sticker": true
+  },
+  "setStickerPositionInSet": {
+   "position": true,
+   "sticker": true
+  },
+  "setStickerSetThumbnail": {
+   "format": true,
+   "name": true,
+   "thumbnail": false,
+   "user_id": true
+  },
+  "setStickerSetTitle": {
+   "name": true,
+   "title": true
+  },
+  "setUserEmojiStatus": {
+   "emoji_status_custom_emoji_id": false,
+   "emoji_status_expiration_date": false,
+   "user_id": true
+  },
+  "setWebhook": {
+   "allowed_updates": false,
+   "certificate": false,
+   "drop_pending_updates": false,
+   "ip_address": false,
+   "max_connections": false,
+   "secret_token": false,
+   "url": true
+  },
+  "stopMessageLiveLocation": {
+   "business_connection_id": false,
+   "chat_id": false,
+   "inline_message_id": false,
+   "message_id": false,
+   "reply_markup": false
+  },
+  "stopPoll": {
+   "business_connection_id": false,
+   "chat_id": true,
+   "message_id": true,
+   "reply_markup": false
+  },
+  "transferBusinessAccountStars": {
+   "business_connection_id": true,
+   "star_count": true
+  },
+  "transferGift": {
+   "business_connection_id": true,
+   "new_owner_chat_id": true,
+   "owned_gift_id": true,
+   "star_count": false
+  },
+  "unbanChatMember": {
+   "chat_id": true,
+   "only_if_banned": false,
+   "user_id": true
+  },
+  "unbanChatSenderChat": {
+   "chat_id": true,
+   "sender_chat_id": true
+  },
+  "unhideGeneralForumTopic": {
+   "chat_id": true
+  },
+  "unpinAllChatMessages": {
+   "chat_id": true
+  },
+  "unpinAllForumTopicMessages": {
+   "chat_id": true,
+   "message_thread_id": true
+  },
+  "unpinAllGeneralForumTopicMessages": {
+   "chat_id": true
+  },
+  "unpinChatMessage": {
+   "business_connection_id": false,
+   "chat_id": true,
+   "message_id": false
+  },
+  "upgradeGift": {
+   "business_connection_id": true,
+   "keep_original_details": false,
+   "owned_gift_id": true,
+   "star_count": false
+  },
+  "uploadStickerFile": {
+   "sticker": true,
+   "sticker_format": true,
+   "user_id": true
+  },
+  "verifyChat": {
+   "chat_id": true,
+   "custom_description": false
+  },
+  "verifyUser": {
+   "custom_description": false,
+   "user_id": true
+  }
+ },
+ "release_date": "August 24, 2026",
+ "source": "https://github.com/PaulSonOfLars/telegram-bot-api-spec (api.min.json), MIT licence, Copyright (c) 2020 Paul Larsen. Reduced to field names and required flags.",
+ "types": {
+  "InputMedia": {},
+  "InputMediaAnimation": {
+   "caption": false,
+   "caption_entities": false,
+   "duration": false,
+   "has_spoiler": false,
+   "height": false,
+   "media": true,
+   "parse_mode": false,
+   "show_caption_above_media": false,
+   "thumbnail": false,
+   "type": true,
+   "width": false
+  },
+  "InputMediaAudio": {
+   "caption": false,
+   "caption_entities": false,
+   "duration": false,
+   "media": true,
+   "parse_mode": false,
+   "performer": false,
+   "thumbnail": false,
+   "title": false,
+   "type": true
+  },
+  "InputMediaDocument": {
+   "caption": false,
+   "caption_entities": false,
+   "disable_content_type_detection": false,
+   "media": true,
+   "parse_mode": false,
+   "thumbnail": false,
+   "type": true
+  },
+  "InputMediaLink": {
+   "type": true,
+   "url": true
+  },
+  "InputMediaLivePhoto": {
+   "caption": false,
+   "caption_entities": false,
+   "has_spoiler": false,
+   "media": true,
+   "parse_mode": false,
+   "photo": true,
+   "show_caption_above_media": false,
+   "type": true
+  },
+  "InputMediaLocation": {
+   "horizontal_accuracy": false,
+   "latitude": true,
+   "longitude": true,
+   "type": true
+  },
+  "InputMediaPhoto": {
+   "caption": false,
+   "caption_entities": false,
+   "has_spoiler": false,
+   "media": true,
+   "parse_mode": false,
+   "show_caption_above_media": false,
+   "type": true
+  },
+  "InputMediaSticker": {
+   "emoji": false,
+   "media": true,
+   "type": true
+  },
+  "InputMediaVenue": {
+   "address": true,
+   "foursquare_id": false,
+   "foursquare_type": false,
+   "google_place_id": false,
+   "google_place_type": false,
+   "latitude": true,
+   "longitude": true,
+   "title": true,
+   "type": true
+  },
+  "InputMediaVideo": {
+   "caption": false,
+   "caption_entities": false,
+   "cover": false,
+   "duration": false,
+   "has_spoiler": false,
+   "height": false,
+   "media": true,
+   "parse_mode": false,
+   "show_caption_above_media": false,
+   "start_timestamp": false,
+   "supports_streaming": false,
+   "thumbnail": false,
+   "type": true,
+   "width": false
+  },
+  "InputMediaVoiceNote": {
+   "caption": false,
+   "caption_entities": false,
+   "duration": false,
+   "media": true,
+   "parse_mode": false,
+   "type": true
+  },
+  "LinkPreviewOptions": {
+   "is_disabled": false,
+   "prefer_large_media": false,
+   "prefer_small_media": false,
+   "show_above_text": false,
+   "url": false
+  }
+ },
+ "version": "Bot API 10.3"
+}

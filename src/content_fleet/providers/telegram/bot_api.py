@@ -112,7 +112,7 @@ class TelegramBotApi(Provider):
             )
         if set(account.credentials) != {"token"}:
             raise ValueError("credentials must contain exactly one role: token")
-        unknown = set(account.settings) - {"chat_id", "api_base"}
+        unknown = set(account.settings) - {"chat_id", "api_base", "test_environment"}
         if unknown:
             raise ValueError(f"unknown settings: {sorted(unknown)}")
 
@@ -279,7 +279,10 @@ class TelegramBotApi(Provider):
         a retryable error. Edits and deletes converge, so they just retry.
         """
         base = str(ctx.account.settings.get("api_base", DEFAULT_API_BASE)).rstrip("/")
-        url = f"{base}/bot{ctx.credentials['token'].reveal()}/{method}"
+        # Telegram's separate test servers are reached by the same host with
+        # "/test" between the token and the method.
+        environment = "test/" if ctx.account.settings.get("test_environment") else ""
+        url = f"{base}/bot{ctx.credentials['token'].reveal()}/{environment}{method}"
         started = time.perf_counter()
 
         def ambiguous_or(category: ErrorCategory, what: str) -> Exception:
