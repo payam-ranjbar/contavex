@@ -114,7 +114,7 @@ one presigned GET URL. Options compared in
 
 | Option | Verdict |
 |---|---|
-| **Hand-written AWS Signature V4 over httpx2** (`staging/sigv4.py`, about 100 lines, standard library `hmac`/`hashlib`) | **Chosen.** Checked in `tests/unit/test_staging.py` against the three worked examples in the Amazon S3 API reference (GET object, PUT object, presigned URL): all three signatures match. |
+| **Hand-written AWS Signature V4 over httpx2** (`staging/sigv4.py`, about 100 lines, standard library `hmac`/`hashlib`) | **Chosen.** Checked in `tests/unit/test_staging.py` against three worked examples from the Amazon S3 API reference (GET object, PUT object, presigned URL): all three signatures match. Caveat: the expected signatures were written from memory, because the AWS pages would not render during research; a separate scratch implementation by the researcher matched botocore byte for byte on PUT and DELETE. Re-read the AWS pages, or add a MinIO container test, before treating this as fully confirmed. |
 | boto3 / botocore | Rejected. Tens of megabytes and its own HTTP stack for two requests. |
 | aiobotocore, minio client | Rejected for the same reason; each brings its own HTTP client. |
 | Small signer libraries | None found that works with httpx2 and is maintained. |
