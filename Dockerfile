@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 
-# NOT YET VERIFIED: written while the Docker daemon was unavailable. The
-# Docker verification phase must build this, then pin both images by digest
-# (name:tag@sha256:...) for reproducibility.
-ARG PYTHON_IMAGE=python:3.14-slim
-ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.2
+# Base images are pinned by digest so a rebuild uses the same bytes. To update:
+#   docker buildx imagetools inspect python:3.14-slim   (take the top-level Digest)
+# and rebuild; do the same for the uv image.
+ARG PYTHON_IMAGE=python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.11.2@sha256:c4f5de312ee66d46810635ffc5df34a1973ba753e7241ce3a08ef979ddd7bea5
 
 FROM ${UV_IMAGE} AS uv
 
@@ -40,7 +40,9 @@ ENV PATH=/app/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1
 USER 10001:10001
 VOLUME ["/data"]
-EXPOSE 8080
+# 8080: consumer API (internal). 8081: public media listener, only used by
+# the self-hosted staging strategy.
+EXPOSE 8080 8081
 # Readiness, checked with the service's own interpreter: no curl in the image.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --start-interval=2s --retries=3 \
     CMD ["python", "-m", "content_fleet", "healthcheck"]

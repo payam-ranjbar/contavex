@@ -1,4 +1,3 @@
-# NOT YET VERIFIED: written while the Docker daemon was unavailable.
 #
 # Consumers reach the service at http://publisher:8080 on the "content-fleet"
 # network. No host port is published here; see compose.dev.yaml for local use.
