@@ -14,6 +14,7 @@ opened, lives in the per-topic documents:
 | LinkedIn REST API (`LinkedIn-Version: 202609`) — initial pass | [INTEGRATIONS/linkedin.md](INTEGRATIONS/linkedin.md) |
 | Docker secrets, image build, health, networking | [research/docker-and-secrets.md](research/docker-and-secrets.md) |
 | Service interface, runtime stack, persistence, dependencies | [research/interface-and-stack.md](research/interface-and-stack.md) |
+| Vendor test facilities, credential onboarding steps, S3 signing options | [research/testing-and-onboarding.md](research/testing-and-onboarding.md) |
 
 ## Method
 
@@ -171,6 +172,21 @@ Starlette's test client now expects.
 | "Multiple implementations per platform" is a future concern | It is present from day one for Instagram. |
 | `httpx` is the default Python HTTP client | Superseded by `httpx2`. |
 
+## Testing facilities offered by the vendors
+
+Researched for the question "is there a proper way to test these integrations?".
+
+| Vendor | Sandbox for publishing | Machine-readable API description | What this project does |
+|---|---|---|---|
+| Telegram | Yes: separate test servers, reached with `/bot<token>/test/METHOD` | None official; a community JSON spec tracks Bot API 10.3 | `test_environment` account setting; the fake validates every request against the community spec |
+| Instagram | None. No dry run; every publish is a real post, and this API cannot delete it | None | Stateful fake; live test against a throw-away professional account |
+| LinkedIn | None. Test companies are forbidden; up to five manual test profiles are allowed | None (official Postman collections exist) | Stateful fake; live test posts with `CONNECTIONS` visibility and deletes |
+
+Since no vendor provides a mock or a schema to validate against, the fakes
+are our reading of the documentation. They make the service's own logic
+testable (state machines, retries, recovery, redaction); they cannot confirm
+vendor behaviour. That is what the live tests are for.
+
 ## Unverified items that matter most
 
 The complete lists are in each detailed document. These are the ones to
@@ -182,7 +198,9 @@ settle first, by live test, when credentials exist:
 4. Instagram: the real publish quota (50 vs 100) and whether stories count.
 5. Instagram: the result of a second `media_publish` on an already-published container.
 6. Instagram: whether posts made while the Meta app is in Development mode are publicly visible.
-7. LinkedIn: whether a self-serve app may call `/rest/posts` and `/rest/images`, or only the legacy `/v2/ugcPosts`.
-8. LinkedIn: whether non-partner apps receive refresh tokens.
+7. LinkedIn: whether a self-serve app may call `/rest/posts` and `/rest/images`, or only the legacy `/v2/ugcPosts`. The documentation leans yes (the Images API page describes `w_member_social`-only tokens on the versioned gateway); the implementation uses `/rest/posts` only. A 403 on the first live post means the legacy endpoint is needed.
+8. LinkedIn: refresh tokens. Per the documentation, non-partner apps do not receive them; the implementation uses one if present and otherwise reports the access token's expiry date.
 9. Docker: whether a trailing newline/CRLF in a file-sourced secret is preserved (assumed yes; the service trims).
 10. Docker: SQLite WAL behaviour on a Docker Desktop named volume (expected fine; bind mounts from Windows are avoided).
+11. Instagram: whether Meta's media fetcher accepts presigned URLs (long query strings). If the first live publish from object storage fails to fetch, set `public_base_url` in `[staging]`.
+12. Instagram: whether `Authorization: Bearer` is accepted on every `graph.instagram.com` call used (the implementation never puts the token in a URL except for the documented refresh call).

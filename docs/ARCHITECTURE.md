@@ -1,6 +1,8 @@
 # Architecture
 
-Status: **ACCEPTED 2026-10-09.** The operator decided D-2 (Python + FastAPI),
+Status: **ACCEPTED 2026-10-09 and implemented.** All three providers are built; the reviews in section 7 record what changed along the way.
+
+Original decision note: **ACCEPTED 2026-10-09.** The operator decided D-2 (Python + FastAPI),
 D-5 (media is uploaded by consumers; public staging is a pluggable strategy),
 the Instagram variant (Instagram Login first) and D-7 (encrypt the token store).
 
@@ -143,7 +145,7 @@ stored media item into a public URL and can withdraw it afterwards:
 
 | Stager | What it does | When to use |
 |---|---|---|
-| `object-storage` | Pushes the file to an S3-compatible bucket and returns its CDN/public URL | The operator has, or is willing to run, a bucket or CDN |
+| `object-storage` | Pushes the file to an S3-compatible bucket. By default the bucket stays private and the provider gets a presigned GET URL that expires (one hour unless configured, 24 hours at most); with `public_base_url` set, a URL on the operator's CDN or public domain instead | The operator has, or is willing to run, a bucket |
 | `self-hosted` | The service serves the file itself at an unguessable, expiring URL on a **separate public listener**, to be placed behind the operator's reverse proxy/TLS | No external storage; the operator can expose one HTTPS path |
 
 Stagers are selected by configuration through the same kind of explicit
@@ -310,25 +312,31 @@ How capability differences are represented (F-3, F-4, F-5):
 Evolution (F-6): `/v1` path prefix; additive changes only within a version;
 consumers must ignore unknown fields; enumerations may grow.
 
-### Repository layout (if D-2 is accepted)
+### Repository layout
 
 ```
 src/content_fleet/
-    api/            routes, auth, problem details, idempotency
-    core/           models, capabilities, errors, lifecycle, retry policy
+    api/app.py          routes, auth, problem details, idempotency
+    core/               models, capabilities, error vocabulary
     providers/
-        registry.py             the (platform, implementation) table
+        base.py         the Provider interface and step outcomes
+        registry.py     the (platform, implementation) table
+        http.py         transport failure handling shared by all providers
         telegram/bot_api.py
         instagram/instagram_login.py
-    store/          sqlite access, migrations/*.sql
-    worker.py
-    services.py     wiring; fails fast on bad config or missing secrets
-    media.py        uploaded-media store and retention
-    staging/        registry.py, object_storage.py, self_hosted.py
-    secrets.py      secret resolver seam, redaction helpers
-    config.py
+        linkedin/rest.py
+    staging/            Stager interface, registry, self_hosted.py, object_storage.py, sigv4.py
+    store/              sqlite access, migrations/*.sql
+    worker.py           step loop, retry policy, credential refresh
+    credentials.py      seed secrets + encrypted store for refreshed tokens
+    media.py            uploaded-media store and retention
+    secrets.py          secret resolver seam, redaction
+    services.py         wiring; fails fast on bad config or missing secrets
+    config.py  observability.py  __main__.py
 tests/
     unit/  integration/  contract/  docker/  live/
+    fakes/              stateful fakes of the three vendors
+    fixtures/telegram/  Bot API field list the Telegram fake checks requests against
 config/fleet.example.toml
 secrets/*.example
 Dockerfile  compose.yaml  compose.dev.yaml
@@ -371,7 +379,7 @@ of Done.
 The Phase D review (after Telegram and Instagram are implemented) is
 recorded here, with any changes it causes to the decisions above.
 
-### 2026-10-09 — after the foundation and Telegram (interim note, not the Phase D review)
+### 2026-10-09 — after the foundation and Telegram (interim note)
 
 Built as designed, with these adjustments made while implementing:
 
@@ -379,12 +387,91 @@ Built as designed, with these adjustments made while implementing:
 - **A time limit on the whole provider step**, enforced by the worker. Per-operation
   HTTP timeouts restart with every chunk of an upload, so they do not bound a step.
   A step cancelled this way is treated exactly like a crash mid-step.
-- **Encrypted credential store deferred to the Instagram phase.** Telegram's token is
-  static; nothing needs the store yet, so `cryptography` is not a dependency yet.
 - **Publications double as their own jobs** (one table) rather than a separate
   `jobs` table: a publication has exactly one pending step at a time.
 
-Observed against the design goals so far: the Telegram module is the only file that
-knows Telegram; the core has no platform names in it; the contract suite runs
-against the implementation through the public API only. Whether the step interface
-holds for a genuinely multi-step provider is unproven until Instagram exists.
+### 2026-10-09 — Phase D review, after Telegram and Instagram
+
+The questions are the ones the brief asks before a third provider is added.
+
+**Did the abstraction survive both platforms cleanly?** The step interface did. Telegram
+is one step; Instagram is stage → create → (wait for children → create parent) → wait →
+publish → recover, with a checkpoint between each, and the worker needed no knowledge of
+any of it. Four additions to the core were needed, none of them platform-specific:
+
+| Addition | Why | Evidence it is general |
+|---|---|---|
+| `PublishError(final=True)` | "This publication is over, but submitting it again may work" (an expired container). `retryable` alone could not say that: it also told the worker to repeat the step. | LinkedIn uses it for media that never finishes processing. |
+| Encrypted credential store, `refresh_credentials`, credential health on accounts | Instagram's token changes while the service runs. | LinkedIn uses the same three pieces, with two mutable roles instead of one. |
+| The `Stager` seam and its registry | Instagram fetches media by URL; the operator's media is not public. | Kept out of the Instagram module; a second Instagram implementation or any URL-fetching provider reuses it. |
+| Checkpoints survive a retried step | A step that fails after checkpointing progress (three of four carousel children created) must resume from there. | Found by a LinkedIn test; affects Instagram too. |
+
+**Are vendor-specific concerns leaking into consumers?** Three things a consumer sees are
+vendor-shaped, and each is deliberate:
+
+- `kind` values `reel` and `story` are Instagram's vocabulary. They are honest: there is
+  no neutral word for them, and an account's capabilities list which kinds it takes.
+- `options.<platform>` is vendor-specific by construction, and namespaced so it cannot
+  collide or be applied to the wrong platform.
+- Post ids are the vendor's own identifiers, in the vendor's format. They are opaque to
+  consumers; nothing asks a consumer to parse one.
+
+Nothing else leaks: no vendor error codes in the error category, no vendor state names in
+the status, no token or URL shapes anywhere.
+
+**Are capability differences represented honestly?** Yes, and tested per provider:
+Instagram declares no text-only posts, no edit, no delete, JPEG only, and offers the
+`upload` media source only when staging is configured; Telegram declares that documents
+cannot be supplied by URL. Each refusal happens before any vendor call.
+
+**Is adding another implementation straightforward?** Instagram took one module, one line
+in the registry, one fake and one contract-suite driver. The contract suite ran unchanged
+against it apart from one generalisation (below).
+
+**Did we overgeneralize, or create unnecessary abstractions?**
+
+- *Under*-generalized: the contract suite assumed every provider can publish text alone.
+  Fixed by letting each driver supply its simplest supported request.
+- *Duplication worth removing:* both providers classified connection failures with the
+  same dozen lines, and the one distinction that matters ("could the request have reached
+  the vendor?") was written twice. Extracted to `providers/http.py` before LinkedIn, which
+  now uses it too. Response classification stays per provider: it is genuinely different.
+- *Not extracted on purpose:* the two "recover after an unconfirmed publish" routines look
+  alike but ask different questions of different APIs. One more provider would be needed
+  to see a real common shape.
+- *Nothing removed.* `reconcile`, `step_is_repeatable`, `Unknown` and `checkpoint` are all
+  exercised by Instagram; before it they were only exercised by the scripted test provider.
+
+**Are tests sufficiently platform-independent?** The lifecycle, idempotency, retry and
+crash-recovery tests run against a scripted provider and name no platform. The contract
+suite names no platform in any test body. Vendor knowledge lives in the fakes, the
+drivers and the per-provider integration tests, where it belongs.
+
+### 2026-10-09 — after LinkedIn
+
+LinkedIn was the test of whether the design had been fitted to its first two users.
+
+- **It fit without changing the Provider interface.** Upload → wait → create → recover is
+  the same shape of state machine. Its differences landed where the design has room for
+  them: the author is an account setting; byte uploads use the media store directly and
+  need no stager; "little" text is an extra `text_format` in capabilities plus an escaping
+  step inside the module.
+- **One assumption was wrong and was fixed:** the worker assumed every credential role a
+  provider calls mutable is present on every account. A LinkedIn account may have no
+  refresh token.
+- **A capability difference inside one platform.** A LinkedIn Page can list its posts, so
+  an unconfirmed create is reconciled; a personal profile cannot, so the same situation
+  ends as `outcome_unknown`. Both are the same implementation; the difference is the
+  account. This is represented in behaviour and documented, but not yet as capability
+  *data* a consumer could read. Worth adding (`reconciles_lost_responses`) if a consumer
+  ever needs to choose on it.
+- **Large uploads span steps.** A video is uploaded in 4 MB parts with the part list and
+  ETags checkpointed, and a step yields after 45 seconds, so a 500 MB file neither
+  exceeds the step limit nor restarts from zero after a crash.
+
+### Limits of what has been shown
+
+Every provider is verified against a fake that encodes our reading of the vendor's
+documentation. No request has yet reached a real vendor API with a valid credential. The
+live tests exist for that; until they have run, treat vendor-facing behaviour as
+implemented to the documentation, not as confirmed.

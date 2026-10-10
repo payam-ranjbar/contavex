@@ -1,4 +1,3 @@
-#
 # Consumers reach the service at http://publisher:8080 on the "content-fleet"
 # network. No host port is published here; see compose.dev.yaml for local use.
 name: content-fleet
@@ -23,23 +22,34 @@ services:
     volumes:
       - fleet-data:/data
       - ./config/fleet.toml:/config/fleet.toml:ro
-    # One entry per credential named in config/fleet.toml. Each is mounted
+    # One entry per secret named in config/fleet.toml. Each is mounted
     # read-only at /run/secrets/<name> and never enters the environment.
     secrets:
       - consumer_api_key_demo
       - telegram_news_bot_token
+      # - master_key
+      # - instagram_brand_access_token
+      # - s3_access_key_id
+      # - s3_secret_access_key
+      # - linkedin_founder_access_token
+      # - linkedin_client_id
+      # - linkedin_client_secret
     networks:
       - fleet
     expose:
       - "8080"
+    # Only for the "self-hosted" staging strategy: the public media listener.
+    # Bind it to loopback and put an HTTPS reverse proxy in front of it.
+    # ports:
+    #   - "127.0.0.1:8081:8081"
 
 networks:
   fleet:
     name: content-fleet
 
 volumes:
-  # Publication history and uploaded media. Back it up; do not bind-mount it
-  # from a Windows path (SQLite needs real file locking).
+  # Publication history, uploaded media and encrypted tokens. Back it up; do
+  # not bind-mount it from a Windows path (SQLite needs real file locking).
   fleet-data:
 
 secrets:
@@ -47,3 +57,17 @@ secrets:
     file: ./secrets/consumer_api_key_demo
   telegram_news_bot_token:
     file: ./secrets/telegram_news_bot_token
+  # master_key:
+  #   file: ./secrets/master_key
+  # instagram_brand_access_token:
+  #   file: ./secrets/instagram_brand_access_token
+  # s3_access_key_id:
+  #   file: ./secrets/s3_access_key_id
+  # s3_secret_access_key:
+  #   file: ./secrets/s3_secret_access_key
+  # linkedin_founder_access_token:
+  #   file: ./secrets/linkedin_founder_access_token
+  # linkedin_client_id:
+  #   file: ./secrets/linkedin_client_id
+  # linkedin_client_secret:
+  #   file: ./secrets/linkedin_client_secret

@@ -1,120 +1,343 @@
 # Content Fleet
 
-A Dockerized service that publishes social-media content to several
-platforms behind one HTTP contract. Consuming applications upload media,
-submit a publication, and poll its status; they never see a vendor API or a
-vendor credential.
+A Dockerized service that publishes social-media content to Telegram,
+Instagram and LinkedIn behind one HTTP contract. Consuming applications
+upload media, submit a publication and poll its status. They never see a
+vendor API or a vendor credential.
 
 ## Status
 
-| Phase | State |
+Everything is built and tested against faked vendor APIs. **Nothing has been
+run against a real Telegram, Instagram or LinkedIn account yet**: that needs
+credentials, and is the only step left. See [Go live](#go-live).
+
+| Part | State |
 |---|---|
-| 1. Requirements | Done — [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) |
-| 2. Research | Done — [docs/RESEARCH.md](docs/RESEARCH.md) |
-| 3. Architecture | Accepted — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| 4. Foundation | Done, tested |
-| 5. Telegram | Implemented and tested against a faked Bot API. **Not yet run against a real channel** (needs a bot token). |
-| 6. Instagram | Not started |
-| 7. Architecture review | Not started |
-| 8. LinkedIn | Not started |
-| 9–10. Hardening, Docker verification | Docker files are written but **have never been built** (no Docker daemon was available) |
+| Service (API, worker, storage, secrets) | Done, tested |
+| Telegram (Bot API) | Done, tested against a fake; requests checked against the Bot API 10.3 field list |
+| Instagram (Instagram Login) | Done, tested against a fake |
+| LinkedIn (REST API) | Done, tested against a fake |
+| Media staging for Instagram (S3-compatible, or self-hosted) | Done; S3 signing verified against AWS's published examples |
+| Docker image and Compose | Built and smoke-tested: a consumer container publishes through the service container |
 
-## Requirements
+## Contents
 
-- [uv](https://docs.astral.sh/uv/) and Python 3.14 for development
-- Docker with Compose to run the service as a container
+- [Quick start](#quick-start)
+- [Getting credentials for each platform](#getting-credentials-for-each-platform)
+- [Using the API](#using-the-api)
+- [What each platform supports](#what-each-platform-supports)
+- [Running in Docker](#running-in-docker)
+- [Tests](#tests)
+- [Go live](#go-live)
+- [Extending](#extending)
+- [Documents](#documents)
 
-## Build and test
+## Quick start
 
-```sh
-uv sync                 # create .venv from the lockfile
-uv run pytest           # unit + integration + contract tests (no network, no credentials)
-uv run ruff check .     # lint
-uv run mypy             # type check
-```
-
-Test suites, selected by marker:
-
-| Suite | Command | Needs |
-|---|---|---|
-| unit | `uv run pytest -m unit` | nothing |
-| integration (faked vendor HTTP) | `uv run pytest -m integration` | nothing |
-| contract (same behaviour for every implementation) | `uv run pytest -m contract` | nothing |
-| docker | `uv run pytest -m docker` | Docker daemon — *not written yet* |
-| live | see below | real credentials |
-
-A plain `uv run pytest` never runs `docker` or `live` tests.
-
-### Live tests
-
-They post to a real channel, so they need two explicit opt-ins: the marker
-and an environment variable.
-
-```powershell
-$env:CF_LIVE_TESTS = "1"
-$env:CF_LIVE_TELEGRAM_TOKEN_FILE = "secrets\telegram_news_bot_token"
-$env:CF_LIVE_TELEGRAM_CHAT_ID = "-100..."
-uv run pytest -m live tests/live -s
-```
-
-## Configure
-
-Non-secret configuration is one file; secrets are separate files it refers
-to by name.
+Requirements: Docker with Compose. For development also
+[uv](https://docs.astral.sh/uv/) and Python 3.14.
 
 ```sh
-cp config/fleet.example.toml config/fleet.toml
+cp config/fleet.example.toml config/fleet.toml     # then edit: channel id, accounts
 ```
 
-Create each secret as a file in `secrets/` (git-ignored), with no trailing
-newline:
+Create each secret named in `config/fleet.toml` as a file in `secrets/`
+(git-ignored), without a trailing newline:
 
 ```powershell
-Set-Content -NoNewline secrets\consumer_api_key_demo  -Value '<a long random string>'
+# PowerShell
+Set-Content -NoNewline secrets\consumer_api_key_demo   -Value '<a long random string>'
 Set-Content -NoNewline secrets\telegram_news_bot_token -Value '<token from @BotFather>'
 ```
 
 ```sh
+# bash
 printf '%s' '<a long random string>'  > secrets/consumer_api_key_demo
 printf '%s' '<token from @BotFather>' > secrets/telegram_news_bot_token
 ```
 
-Process settings are environment variables; all have defaults:
+Start it, reachable from your machine on `127.0.0.1:8080`:
 
-| Variable | Default | Meaning |
-|---|---|---|
-| `CF_PORT` | `8080` | Listen port |
-| `CF_DATA_DIR` | `/data` | Database and uploaded media |
-| `CF_CONFIG_FILE` | `/config/fleet.toml` | Accounts and consumers |
-| `CF_SECRETS_DIR` | `/run/secrets` | Where secret files are mounted |
-| `CF_LOG_LEVEL` | `INFO` | |
-| `CF_MAX_UPLOAD_BYTES` | 64 MiB | Largest accepted media upload |
-| `CF_MEDIA_RETENTION_SECONDS` | 48 h | How long an unused upload is kept |
-| `CF_MAX_ATTEMPTS` | `5` | Consecutive failed tries of a step before giving up |
-| `CF_PUBLICATION_DEADLINE_SECONDS` | 6 h | A publication not finished by then fails |
-| `CF_PROVIDER_TIMEOUT_SECONDS` | `120` | Limit for one vendor step, uploads included |
+```sh
+docker compose -f compose.yaml -f compose.dev.yaml up --build -d
+curl http://127.0.0.1:8080/readyz
+```
 
-How secrets are handled, rotated and kept out of logs: [docs/SECURITY.md](docs/SECURITY.md).
+The service refuses to start, with a message naming the problem, if a secret
+file is missing or an account is misconfigured.
 
-### Telegram setup
+## Getting credentials for each platform
 
-1. Create a bot with [@BotFather](https://t.me/BotFather) and save its token as a secret file.
-2. Add the bot to your channel as an administrator with **Post messages** only.
-3. Put the channel's numeric id (`-100…`) in `config/fleet.toml`.
+Each platform has its own "front door". This is what to do at each one, and
+what to put where afterwards. Labels are quoted from the vendors'
+documentation as of 2026-10-09; dashboards change, so details may differ.
+Background and sources: [docs/research/testing-and-onboarding.md](docs/research/testing-and-onboarding.md).
 
-Details and limits: [docs/INTEGRATIONS/telegram.md](docs/INTEGRATIONS/telegram.md).
+### Telegram
 
-## Run
+No review, no cost. You need a Telegram account and a channel you administer.
 
-With Docker (the intended way):
+1. In Telegram, open a chat with **@BotFather** and send `/newbot`. Choose a
+   display name, then a username ending in `bot`.
+2. BotFather replies with a token like `110201543:AAH...`. Save it:
+   `secrets/telegram_news_bot_token`.
+3. Open your channel → channel info → **Administrators** → **Add Admin** →
+   find the bot → grant only **Post Messages**.
+4. Find the channel's numeric id (it starts with `-100`). For a public
+   channel, open this in a browser, using your token and channel name:
+   `https://api.telegram.org/bot<TOKEN>/getChat?chat_id=@yourchannel` and read
+   `result.id`. For a private channel, post any message in it and open
+   `https://api.telegram.org/bot<TOKEN>/getUpdates`; the id is
+   `channel_post.chat.id`.
+5. In `config/fleet.toml`:
+
+   ```toml
+   [accounts.news-channel]
+   platform = "telegram"
+   implementation = "bot-api"
+   credentials = { token = "telegram_news_bot_token" }
+   settings = { chat_id = "-1001234567890" }
+   ```
+
+If the token leaks, or to rotate it: BotFather `/token`, replace the file, restart.
+
+**A safe place to test.** A private channel with no subscribers is enough.
+Telegram also has separate test servers: log in to them from a Telegram
+client (Desktop: Settings → Shift+Alt+right-click "Add Account" → "Test
+Server"), create a bot with the BotFather *there*, and add
+`test_environment = true` to the account's settings.
+
+### Instagram
+
+You need an Instagram **professional** account (Business or Creator) and a
+Facebook account registered at [developers.facebook.com](https://developers.facebook.com).
+No Facebook Page, no App Review and no Business Verification are needed to
+publish to an account you own.
+
+1. Go to <https://developers.facebook.com/apps/creation/> and create an app.
+   When asked for a use case choose **Manage messaging and content on
+   Instagram**. (Older dashboards: **Other** → app type **Business**, then
+   add the **Instagram** product.)
+2. In the app dashboard open the Instagram use case and select **API setup
+   with Instagram Login**.
+3. Under permissions make sure **`instagram_business_basic`** and
+   **`instagram_business_content_publish`** are added.
+4. In **Generate access tokens** click **Add account**, log in to your
+   Instagram professional account, then **Generate token**. Copy the token:
+   it is valid for 60 days and the service renews it by itself. Save it:
+   `secrets/instagram_brand_access_token`.
+5. Find the account id. Open, with your token:
+   `https://graph.instagram.com/v25.0/me?fields=user_id,username&access_token=<TOKEN>`
+   and take **`user_id`** (not `id`).
+6. Create the encryption key for stored tokens (once per installation):
+
+   ```sh
+   python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode(),end='')" > secrets/master_key
+   ```
+
+7. In `config/fleet.toml`:
+
+   ```toml
+   [service]
+   master_key = "master_key"
+
+   [accounts.brand-instagram]
+   platform = "instagram"
+   implementation = "instagram-login"
+   credentials = { access_token = "instagram_brand_access_token" }
+   settings = { ig_user_id = "17841400000000000" }
+   ```
+
+8. Decide how uploaded files reach Instagram. Instagram downloads media
+   from a public URL; it does not accept uploads. Choose one `[staging]`
+   strategy in `config/fleet.toml` (both are shown, commented, in the
+   example file):
+   - **`object-storage`**: an S3-compatible bucket (AWS S3, Cloudflare R2,
+     MinIO, Backblaze B2). The bucket stays private; Instagram gets a link
+     that expires after an hour. You need an access key allowed to put and
+     delete objects in that bucket.
+   - **`self-hosted`**: the service serves the file itself on port 8081. You
+     put that port behind an HTTPS reverse proxy that is reachable from the
+     internet and give its address as `public_base_url`.
+
+   Without `[staging]`, an Instagram account only accepts media that is
+   already at a public `https://` URL.
+
+Leave the Meta app in **Development mode**. If the token is ever unused for
+60 days it lapses: repeat step 4, replace the secret file, restart.
+
+**A safe place to test.** There is no sandbox. Every publish creates a real
+post, and this API cannot delete posts. Use a second, throw-away
+professional account added to the same app, and delete test posts in the
+Instagram app.
+
+### LinkedIn
+
+LinkedIn always acts on behalf of a person who has approved your app in a
+browser; there is no bot token. Posting to a **personal profile** is
+self-service. Posting to a **company Page** needs a product LinkedIn
+reviews.
+
+**Personal profile**
+
+1. Create an app at <https://www.linkedin.com/developers/apps/new>. It must
+   be associated with a LinkedIn Page (any Page you administer).
+2. On the app's **Products** tab add **Share on LinkedIn** and **Sign In
+   with LinkedIn using OpenID Connect**.
+3. On the **Auth** tab note the **Client ID** and **Client Secret**. Save
+   them: `secrets/linkedin_client_id`, `secrets/linkedin_client_secret`.
+4. Get an access token with LinkedIn's **Token Generator**:
+   <https://www.linkedin.com/developers/tools/oauth/token-generator>. Select
+   your app and the scopes `openid`, `profile`, `w_member_social`, approve,
+   copy the token. Save it: `secrets/linkedin_founder_access_token`.
+5. Find your author id: call
+   `curl -H "Authorization: Bearer <TOKEN>" https://api.linkedin.com/v2/userinfo`
+   and take `sub`. Your author is `urn:li:person:<sub>`.
+6. Create `secrets/master_key` as in Instagram step 6, and in
+   `config/fleet.toml`:
+
+   ```toml
+   [service]
+   master_key = "master_key"
+
+   [accounts.founder-linkedin]
+   platform = "linkedin"
+   implementation = "rest"
+   settings = { author = "urn:li:person:AbCdEf" }
+   [accounts.founder-linkedin.credentials]
+   access_token = "linkedin_founder_access_token"
+   client_id = "linkedin_client_id"
+   client_secret = "linkedin_client_secret"
+   ```
+
+**The 60-day limit.** A LinkedIn access token lasts 60 days. LinkedIn gives
+refresh tokens only to approved partners, so for a self-service app someone
+must repeat step 4 about every 60 days, replace the secret file and restart.
+`GET /v1/accounts` shows the date (`credential_expires_at`) and turns
+`credential_status` to `expiring` ten days ahead. If LinkedIn does give your
+app a refresh token, add it as `refresh_token` and the service renews the
+access token itself for up to a year.
+
+**Company Page**
+
+1. Create a **separate** app with no other products and request
+   **Community Management API** on its Products tab. LinkedIn asks for your
+   legal organisation, a business email and verification by a Page admin.
+2. Authorize with the scopes `w_organization_social r_organization_social
+   rw_organization_admin`. The person authorizing must be an admin or
+   content admin of the Page.
+3. Find the Page's id:
+   `curl -H "Authorization: Bearer <TOKEN>" -H "LinkedIn-Version: 202609" -H "X-Restli-Protocol-Version: 2.0.0" "https://api.linkedin.com/rest/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED"`.
+   The author is `urn:li:organization:<id>`.
+4. Configure it like the personal profile, with that author.
+
+**A safe place to test.** There is no sandbox and LinkedIn forbids test
+companies. For a personal profile, post with
+`"options": {"linkedin": {"visibility": "CONNECTIONS"}}` and delete the post
+afterwards (the live test does exactly that).
+
+## Using the API
+
+Every request carries the consumer's key. Examples use `curl`.
+
+```sh
+KEY='Authorization: Bearer <consumer key>'
+BASE=http://127.0.0.1:8080
+
+# What can I publish to, what does each account support, are its credentials healthy?
+curl -H "$KEY" $BASE/v1/accounts
+
+# Upload a file. The body is the raw file, not a form. Returns {"id": "med_..."}
+curl -H "$KEY" -H 'Content-Type: image/jpeg' --data-binary @photo.jpg "$BASE/v1/media?filename=photo.jpg"
+
+# Publish. Always answers 202 with a Location to poll.
+curl -i -H "$KEY" -H 'Content-Type: application/json' -H 'Idempotency-Key: campaign-42-post-7' \
+  -d '{"account":"news-channel","text":"Launch day.","media":[{"type":"image","media_id":"med_..."}]}' \
+  $BASE/v1/publications
+
+# Poll until status is no longer accepted/processing
+curl -H "$KEY" $BASE/v1/publications/pub_...
+
+# Edit or delete, where the account's capabilities allow it
+curl -X PATCH  -H "$KEY" -H 'Content-Type: application/json' -d '{"text":"Corrected."}' $BASE/v1/publications/pub_...
+curl -X DELETE -H "$KEY" $BASE/v1/publications/pub_...
+```
+
+A publication request:
+
+```json
+{
+  "account": "brand-instagram",
+  "kind": "post",
+  "text": "Launch day. #news",
+  "media": [{ "type": "image", "media_id": "med_...", "alt_text": "Team photo" }],
+  "options": {
+    "telegram": { "disable_notification": true },
+    "instagram": { "share_to_feed": true },
+    "linkedin": { "visibility": "PUBLIC" }
+  },
+  "client_reference": "campaign-42/post-7"
+}
+```
+
+- `kind` is what to publish: `post` everywhere, plus `reel` and `story` on
+  Instagram. Each account lists the kinds it accepts.
+- `media[]` items carry either a `media_id` from an upload, or a public
+  `https://` `url` on accounts that accept URLs.
+- `options` holds platform-specific settings, keyed by platform. Only the
+  target platform's entry is used, so one body can be sent to several
+  accounts.
+- A request the account cannot honour is refused immediately with `422` and
+  the reason. Nothing is silently dropped or downgraded.
+
+**Always send an `Idempotency-Key`**, unique per logical post, and reuse it
+when retrying. The same key with the same body returns the original
+publication instead of posting twice.
+
+Publication states:
+
+| `status` | Meaning |
+|---|---|
+| `accepted` | Stored and queued; nothing sent to the platform yet |
+| `processing` | In progress, or waiting to retry; `error` shows the latest transient problem |
+| `published` | Done; `result.posts` holds the platform's post ids and links |
+| `failed` | Final. `error.retryable` says whether submitting again could work |
+| `outcome_unknown` | The platform may or may not have published it and cannot tell us. The service does not retry by itself. Check the platform, then `POST /v1/publications/{id}/resolution` with `{"published": true}` or `{"published": false}` |
+| `deleted` | Was published, then deleted through this API |
+
+Errors are RFC 9457 problem documents (`application/problem+json`). The
+machine-readable contract is at `GET /openapi.json`, or without a running
+service: `uv run python -m content_fleet openapi`.
+
+## What each platform supports
+
+`GET /v1/accounts` returns this per account, with exact limits.
+
+| | Telegram | Instagram | LinkedIn |
+|---|---|---|---|
+| Text only | Yes (4096 chars) | No | Yes (3000 chars) |
+| Image | Yes | Yes (JPEG) | Yes |
+| Video | Yes | As `reel` | Yes (MP4) |
+| Document | Yes | No | Yes (PDF, Word, PowerPoint) |
+| Several media in one post | Album, 2–10 | Carousel, 2–10 | 2–20 images |
+| Story | No | Yes | No |
+| Text formats | `plain`, `html` | `plain` | `plain`, `little` (LinkedIn markup) |
+| Media by upload | Yes | With `[staging]` | Yes |
+| Media by public URL | Yes (not documents) | Yes | No |
+| Edit text afterwards | Yes | No | Yes |
+| Delete afterwards | Yes (within 48 h) | No | Yes |
+| After a lost response | `outcome_unknown` | Found again automatically | Page: found again. Profile: `outcome_unknown` |
+| Credential upkeep | None | Renewed automatically | Manual every 60 days unless LinkedIn issues refresh tokens |
+
+## Running in Docker
 
 ```sh
 docker compose up --build -d                                    # internal network only
 docker compose -f compose.yaml -f compose.dev.yaml up --build   # also on 127.0.0.1:8080
 ```
 
-Other containers reach the service at `http://publisher:8080` by joining
-the `content-fleet` network:
+Other containers reach the service at `http://publisher:8080` by joining the
+`content-fleet` network:
 
 ```yaml
 services:
@@ -125,6 +348,32 @@ networks:
     external: true
 ```
 
+- Every secret named in `config/fleet.toml` must also be listed under
+  `secrets:` in `compose.yaml` (commented entries are provided).
+- The container runs as a non-root user with a read-only filesystem. The
+  `fleet-data` volume holds the publication history, uploaded media and
+  encrypted tokens: back it up, and back up `secrets/master_key` separately.
+- Port 8080 (the API) is never published by `compose.yaml`. Port 8081 exists
+  only for the `self-hosted` staging strategy and must sit behind your HTTPS
+  proxy.
+- Run exactly one instance. The design relies on a single writer.
+
+Settings are environment variables, all optional:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `CF_PORT` | `8080` | API port |
+| `CF_PUBLIC_PORT` | `8081` | Public media listener (self-hosted staging only) |
+| `CF_DATA_DIR` | `/data` | Database and uploaded media |
+| `CF_CONFIG_FILE` | `/config/fleet.toml` | Accounts and consumers |
+| `CF_SECRETS_DIR` | `/run/secrets` | Where secret files are mounted |
+| `CF_LOG_LEVEL` | `INFO` | |
+| `CF_MAX_UPLOAD_BYTES` | 64 MiB | Largest accepted media upload |
+| `CF_MEDIA_RETENTION_SECONDS` | 48 h | How long an unused upload is kept |
+| `CF_MAX_ATTEMPTS` | `5` | Consecutive failed tries of a step before giving up |
+| `CF_PUBLICATION_DEADLINE_SECONDS` | 6 h | A publication not finished by then fails |
+| `CF_PROVIDER_TIMEOUT_SECONDS` | `120` | Limit for one vendor step |
+
 Without Docker, for development:
 
 ```powershell
@@ -132,85 +381,101 @@ $env:CF_DATA_DIR = ".\data"; $env:CF_CONFIG_FILE = ".\config\fleet.toml"; $env:C
 uv run python -m content_fleet serve
 ```
 
-## Use
+Logs are JSON lines on stdout with `request_id`, `publication_id`, `account`
+and the vendor's own request id where it provides one. `/metrics` serves
+Prometheus metrics; `/livez` and `/readyz` are the health endpoints.
+How secrets are handled and kept out of logs: [docs/SECURITY.md](docs/SECURITY.md).
 
-Every request carries the consumer's key. Examples use `curl`.
+## Tests
 
 ```sh
-KEY='Authorization: Bearer <consumer key>'
-BASE=http://127.0.0.1:8080
-
-# What can I publish to, and what does each account support?
-curl -H "$KEY" $BASE/v1/accounts
-
-# Upload a file (raw body, not a form). Returns {"id": "med_..."}
-curl -H "$KEY" -H 'Content-Type: image/jpeg' --data-binary @photo.jpg "$BASE/v1/media?filename=photo.jpg"
-
-# Publish. Always answers 202 with a Location to poll.
-curl -i -H "$KEY" -H 'Content-Type: application/json' -H 'Idempotency-Key: 6f1c2f0e-campaign-42' \
-  -d '{"account":"news-channel","text":"Launch day.","media":[{"type":"image","media_id":"med_..."}]}' \
-  $BASE/v1/publications
-
-# Poll
-curl -H "$KEY" $BASE/v1/publications/pub_...
-
-# Edit / delete, where the account's capabilities allow it
-curl -X PATCH  -H "$KEY" -H 'Content-Type: application/json' -d '{"text":"Corrected."}' $BASE/v1/publications/pub_...
-curl -X DELETE -H "$KEY" $BASE/v1/publications/pub_...
+uv sync
+uv run pytest            # unit + integration + contract; no network, no credentials, ~30 s
+uv run ruff check .
+uv run mypy
 ```
 
-Publication states:
+| Suite | Command | What it covers |
+|---|---|---|
+| unit | `uv run pytest -m unit` | Validation, lifecycle, retries, idempotency, secrets, staging, S3 signing |
+| integration | `uv run pytest -m integration` | Each provider end to end against a fake of its vendor |
+| contract | `uv run pytest -m contract` | One behavioural suite that every provider implementation must pass |
+| docker | `uv run pytest -m docker` | Builds the image; checks no secret is in any layer; a consumer container publishes through the service container to a fake Telegram container. Needs a Docker daemon |
+| live | see below | The real vendor APIs, with real credentials |
 
-| `status` | Meaning |
-|---|---|
-| `accepted` | Stored and queued; nothing sent to the platform yet |
-| `processing` | In progress or waiting to retry; `error` shows the latest transient problem |
-| `published` | Done; `result.posts` holds the platform's post ids and links |
-| `failed` | Final. `error.retryable` says whether submitting again could work |
-| `outcome_unknown` | The platform may or may not have published it and cannot tell us. The service will not retry by itself. Check the platform, then `POST /v1/publications/{id}/resolution` |
-| `deleted` | Was published, then deleted through this API |
+A plain `uv run pytest` never runs `docker` or `live` tests.
 
-**Always send an `Idempotency-Key`** that is unique per logical post and
-reuse it when retrying. The same key with the same body returns the original
-publication instead of posting twice.
+**How the vendors are faked.** None of the three publishes a test server or
+a machine-readable API description, and the usual HTTP mocking libraries do
+not support the HTTP client used here. So each vendor has a small
+hand-written fake at the HTTP layer (`tests/fakes/`) that keeps state, so
+multi-step flows are real: an Instagram container has to finish processing
+before it can be published; a LinkedIn post can only reference assets that
+were uploaded. The Telegram fake also checks every request against a
+vendored copy of a community-maintained Bot API 10.3 field list
+(`tests/fixtures/telegram/`). The fakes encode our reading of the vendors'
+documentation. They cannot prove the vendors behave that way; the live tests
+do that.
 
-Errors are RFC 9457 problem documents (`application/problem+json`). The
-machine-readable contract is at `GET /openapi.json`, or without a running
-service: `uv run python -m content_fleet openapi`.
+## Go live
 
-## Extend
+With credentials in hand, in this order:
+
+1. **Telegram.** Follow [Telegram](#telegram) above, then:
+
+   ```powershell
+   $env:CF_LIVE_TESTS = "1"
+   $env:CF_LIVE_TELEGRAM_TOKEN_FILE = "secrets\telegram_news_bot_token"
+   $env:CF_LIVE_TELEGRAM_CHAT_ID = "-100..."
+   uv run pytest -m live tests/live/test_telegram_live.py -s
+   ```
+
+   It posts, edits and deletes one message.
+2. **Instagram.** `tests/live/test_instagram_live.py` publishes one image
+   from a public URL to the account. The post is real and must be deleted by
+   hand. The variables are listed at the top of the file.
+3. **LinkedIn.** `tests/live/test_linkedin_live.py` posts to connections
+   only, edits and deletes.
+
+Live tests need both the `-m live` selection and `CF_LIVE_TESTS=1`, so they
+cannot run by accident. Things only a live run can confirm are listed in
+[docs/RESEARCH.md](docs/RESEARCH.md) under "Unverified items".
+
+## Extending
 
 **Add an account.** Add an `[accounts.<id>]` entry to `config/fleet.toml`,
-create its secret file(s), list the secret in `compose.yaml`, restart. The
-service refuses to start if a referenced secret is missing or the account
-settings are wrong.
+create its secret file(s), list them in `compose.yaml`, restart.
 
 **Add a consumer.** Add `[consumers.<id>]` with the name of a new API-key
-secret; create the secret; restart.
+secret, create the secret, restart.
 
 **Add a platform, or a second implementation of an existing platform.**
 
 1. Write a subclass of `Provider` (`src/content_fleet/providers/base.py`) in
    `src/content_fleet/providers/<platform>/<implementation>.py`. Declare
-   `capabilities`, implement `advance` as one step at a time, classify
-   failures with `PublishError`, and return `Unknown` when a post may have
-   been created but cannot be confirmed. `telegram/bot_api.py` is the
-   reference.
-2. List it in `default_registry()` in `providers/registry.py` — the only
-   place that names concrete providers.
-3. Add a vendor fake and a `Driver` to `tests/contract/test_provider_contract.py`.
-   The implementation must pass the whole contract suite.
+   `capabilities`; implement `advance` one step at a time; classify failures
+   with `PublishError`; return `Unknown` when a post may have been created
+   but cannot be confirmed. `telegram/bot_api.py` is the simplest reference,
+   `instagram/instagram_login.py` the multi-step one.
+2. List it in `default_registry()` in `providers/registry.py`, the only place
+   that names concrete providers.
+3. Write a fake of the vendor in `tests/fakes/` and add a `Driver` to
+   `tests/contract/test_provider_contract.py`. The implementation must pass
+   the whole contract suite.
 4. Point an account at it with `platform` / `implementation`. Consumers
    address accounts, so nothing changes for them.
+
+**Add a staging strategy.** Subclass `Stager` (`src/content_fleet/staging/`)
+and list it in `staging/registry.py`.
 
 ## Documents
 
 | Document | Contents |
 |---|---|
 | [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) | Numbered requirements, phase gates, revisions |
-| [docs/RESEARCH.md](docs/RESEARCH.md) | Findings that drive the design, unverified items |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions, alternatives considered, consumer contract |
-| [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Each dependency and why; SDK vs direct API |
+| [docs/RESEARCH.md](docs/RESEARCH.md) | Findings that drive the design; what is still unverified |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Decisions, alternatives considered, review after two and three providers |
+| [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | Each dependency and why; SDK versus direct API |
 | [docs/SECURITY.md](docs/SECURITY.md) | Secret lifecycle, injection, redaction, rotation |
 | [docs/INTEGRATIONS/](docs/INTEGRATIONS/) | Per-platform research: Telegram, Instagram, LinkedIn |
 | [docs/research/](docs/research/) | Detailed research notes and full source lists |

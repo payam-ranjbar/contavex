@@ -1,6 +1,10 @@
 # Copy to config/fleet.toml and edit. This file is NOT secret: it names
 # secrets but never contains them. Each name below is a file in the secrets
-# directory (./secrets locally, /run/secrets in the container).
+# directory (./secrets locally, /run/secrets in the container), and must also
+# be listed under `secrets:` in compose.yaml.
+#
+# Start with one account. Delete or comment out the ones you do not use: the
+# service refuses to start if an account's secret file is missing.
 
 # --- Consumers: the applications allowed to call this service -------------
 # Each gets its own API key, sent as "Authorization: Bearer <key>".
@@ -8,7 +12,7 @@
 [consumers.demo-app]
 api_key = "consumer_api_key_demo"
 
-# --- Accounts: where content can be published ----------------------------
+# --- Telegram ---------------------------------------------------------------
 # Consumers address an account by its id (the part after "accounts.").
 # `platform` + `implementation` select the code that talks to the vendor;
 # changing `implementation` later does not affect consumers.
@@ -20,3 +24,77 @@ implementation = "bot-api"
 credentials = { token = "telegram_news_bot_token" }
 # Numeric channel id (-100...) is preferred; "@channelname" works for public channels.
 settings = { chat_id = "-1000000000000" }
+# To post to Telegram's separate test servers instead (needs a bot created there):
+# settings = { chat_id = "-1000000000000", test_environment = true }
+
+# --- Instagram and LinkedIn need the next two sections ---------------------
+
+# Their tokens are renewed while the service runs, and the renewed tokens are
+# stored encrypted. The key is a secret holding 32 random bytes in base64:
+#   python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode(),end='')" > secrets/master_key
+# Back this key up separately from the data volume. Without it stored tokens
+# cannot be read, and the accounts must be authorized again.
+
+# [service]
+# master_key = "master_key"
+
+# Instagram only accepts media it can download from a public URL. Uploaded
+# files are therefore "staged" publicly while a post is being published and
+# withdrawn afterwards. Pick ONE strategy. Without [staging], Instagram
+# accounts only accept media that is already at a public https URL.
+
+# Strategy A: an S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, Backblaze B2).
+# The bucket stays private; Instagram gets a link that expires.
+# [staging]
+# strategy = "object-storage"
+# credentials = { access_key_id = "s3_access_key_id", secret_access_key = "s3_secret_access_key" }
+# [staging.settings]
+# endpoint = "https://s3.eu-central-1.amazonaws.com"
+# bucket = "my-fleet-staging"
+# region = "eu-central-1"
+# url_ttl_seconds = 3600
+# # Only if the bucket is served publicly through a CDN or custom domain;
+# # then links are built from this address instead of being presigned:
+# # public_base_url = "https://media.example.com"
+
+# Strategy B: this service serves the files itself on port 8081. You must put
+# that port behind an HTTPS reverse proxy reachable from the internet, and
+# give its public address here. Never expose port 8080.
+# [staging]
+# strategy = "self-hosted"
+# settings = { public_base_url = "https://media.example.com" }
+
+# --- Instagram --------------------------------------------------------------
+
+# [accounts.brand-instagram]
+# platform = "instagram"
+# implementation = "instagram-login"
+# # The long-lived token from the Meta App Dashboard. The service refreshes it.
+# credentials = { access_token = "instagram_brand_access_token" }
+# # The professional account's id: the `user_id` returned by GET /me.
+# settings = { ig_user_id = "17841400000000000" }
+
+# --- LinkedIn ---------------------------------------------------------------
+
+# A personal profile. Without a refresh token the access token must be
+# replaced by hand about every 60 days; with client_id/client_secret the
+# service at least reports the date in GET /v1/accounts.
+# [accounts.founder-linkedin]
+# platform = "linkedin"
+# implementation = "rest"
+# settings = { author = "urn:li:person:REPLACE" }
+# [accounts.founder-linkedin.credentials]
+# access_token = "linkedin_founder_access_token"
+# client_id = "linkedin_client_id"
+# client_secret = "linkedin_client_secret"
+
+# A company Page (needs LinkedIn's Community Management API product).
+# [accounts.company-linkedin]
+# platform = "linkedin"
+# implementation = "rest"
+# settings = { author = "urn:li:organization:REPLACE" }
+# [accounts.company-linkedin.credentials]
+# access_token = "linkedin_company_access_token"
+# refresh_token = "linkedin_company_refresh_token"   # only if LinkedIn issued one
+# client_id = "linkedin_client_id"
+# client_secret = "linkedin_client_secret"

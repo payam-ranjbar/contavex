@@ -498,3 +498,20 @@ SDKs and samples
 Attempted, not retrievable (404), nothing used from them
 - https://developers.facebook.com/docs/facebook-login/guides/access-tokens/debugging
 - https://developers.facebook.com/docs/facebook-login/guides/access-tokens/debugging-and-error-handling
+
+## Implementation in this service
+
+Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/instagram/instagram_login.py`.
+
+| Topic | What the implementation does |
+| --- | --- |
+| Variant | Instagram API with Instagram Login only. The Facebook Login variant (delete, binary video upload) is not implemented; it would be a second implementation of the same platform |
+| Account settings | `ig_user_id` (required), `api_version` (default `v25.0`, the version the Instagram reference pages document), `api_base` |
+| Kinds | `post` (one image, or a carousel of 2 to 10 images and videos), `reel` (one video), `story` (one image or video, no caption) |
+| Steps | stage uploads → create container(s) → poll until `FINISHED` → check the publishing quota → `media_publish` → read the permalink |
+| Token | Sent as `Authorization: Bearer`, never in a URL, except the documented refresh call. Refreshed when at least 24 hours old and with under 30 days left; stored encrypted |
+| Unconfirmed `media_publish` | The container's `status_code` is read: `PUBLISHED` means the post exists and its id is looked up among recent media by caption; `FINISHED` twice, 30 seconds apart, means it never happened and it is tried again. If the container cannot be read after five tries: `outcome_unknown` |
+| Expired container | Rebuilt once, then the publication fails as retryable |
+| Quota | `content_publishing_limit` is read before publishing; an exhausted quota defers for 30 minutes instead of spending an attempt |
+| Not implemented | Location, user tags, collaborators, cover image, trial reels, converting non-JPEG images, validating aspect ratio or video codec before upload |
+| Checked how | A stateful fake of the Graph API. Not yet run against Meta itself |

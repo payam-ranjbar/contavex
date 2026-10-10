@@ -5,7 +5,7 @@ notes, architecture decisions and tests can refer to it. Where research
 changes a requirement, the change is recorded in the "Revisions" section at
 the bottom rather than silently edited.
 
-Status: **ingested 2026-10-09**. Research complete; architecture accepted (see ARCHITECTURE.md).
+Status: **implemented 2026-10-09** for all three platforms against faked vendor APIs. Not yet run against real vendor accounts (no credentials were available).
 
 ## 1. Purpose
 
@@ -51,7 +51,7 @@ Platform priority:
 | F-12 | Telegram coverage to research and support as MVP permits: text, images, video, documents, albums, captions, formatting, editing, deletion, channel targeting. |
 | F-13 | Instagram: publish to operator-controlled accounts through the currently supported official Meta API, handling the real media lifecycle (images, video/Reels, carousels, processing states). |
 | F-14 | Instagram: no multi-tenant OAuth onboarding unless research shows it is required for operator-owned accounts. Document what that would take later. |
-| F-15 | LinkedIn: fits the same contract where practical; fundamental differences are represented explicitly. Not started before the Phase D architecture review. |
+| F-15 | LinkedIn: fits the same contract where practical; fundamental differences are represented explicitly. Implemented after the Phase D architecture review. |
 | F-16 | Adding an account, a platform, or a second implementation of a platform are documented, bounded tasks. |
 
 ### Lifecycle, idempotency, reliability

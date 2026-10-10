@@ -38,7 +38,7 @@ version changes.
 | pydantic | 2.14.0 | 2026-10-08 | MIT | Validation of requests, provider options, configuration; JSON Schema. Required by FastAPI. | — |
 | uvicorn | 0.54.0 | 2026-09-25 | BSD-3-Clause | ASGI server. Plain install only. | `uvicorn[standard]` extras (uvloop, httptools) are irrelevant at this volume. |
 | httpx2 | 2.13.1 | 2026-09-23 | BSD-3-Clause | Async HTTP client: timeouts, pooling, multipart, built-in `MockTransport` for tests. | `httpx` 0.28.1 has had no stable release since 2024-12-06. stdlib `urllib` is synchronous with no pooling. aiohttp adds seven dependencies. |
-| cryptography | 50.0.2 | 2026-09-30 | Apache-2.0 OR BSD-3-Clause | Authenticated encryption (AES-GCM) for the credential store. The standard library has no AEAD cipher, and hand-written cryptography is not acceptable. | PyNaCl would also work; `cryptography` is the more widely audited and ships abi3 wheels. Accepted by the operator (D-7). **Not installed yet:** it is added with the credential store in the Instagram phase. |
+| cryptography | 50.0.2 | 2026-09-30 | Apache-2.0 OR BSD-3-Clause | Authenticated encryption (AES-GCM) for the credential store. The standard library has no AEAD cipher, and hand-written cryptography is not acceptable. | PyNaCl would also work; `cryptography` is the more widely audited and ships abi3 wheels. Accepted by the operator (D-7). |
 | structlog | 26.1.0 | 2026-06-06 | MIT OR Apache-2.0 | JSON logs with context bound per request/publication, and a processor chain where redaction is enforced in one place. Zero dependencies. | stdlib `logging` with a custom formatter is the fallback if we want one dependency fewer. |
 | prometheus-client | 0.26.0 | 2026-07-24 | Apache-2.0 AND BSD-2-Clause | Correct exposition format and histograms for `/metrics`. Zero dependencies. | Hand-rolled exposition is easy to get subtly wrong. |
 | sqlite3 | stdlib | — | PSF | Publication, idempotency, job and credential tables. | See "Not added". |
@@ -106,8 +106,25 @@ available for 3.14 at build time (free tier, Apache-2.0, requires
 `docker login dhi.io`). To be settled in the Docker phase, when the daemon is
 available to measure both.
 
-## To be researched in phase C
+## S3 signing: hand-written, no SDK
 
-The object-storage stager must sign S3-compatible requests. Candidates:
-hand-written SigV4 over httpx2 (one PUT and one DELETE), or an S3 client
-library. Decide then, from current sources, with the same criteria as above.
+The object-storage stager makes two kinds of request (PUT, DELETE) and builds
+one presigned GET URL. Options compared in
+[research/testing-and-onboarding.md](research/testing-and-onboarding.md), section C:
+
+| Option | Verdict |
+|---|---|
+| **Hand-written AWS Signature V4 over httpx2** (`staging/sigv4.py`, about 100 lines, standard library `hmac`/`hashlib`) | **Chosen.** Checked in `tests/unit/test_staging.py` against the three worked examples in the Amazon S3 API reference (GET object, PUT object, presigned URL): all three signatures match. |
+| boto3 / botocore | Rejected. Tens of megabytes and its own HTTP stack for two requests. |
+| aiobotocore, minio client | Rejected for the same reason; each brings its own HTTP client. |
+| Small signer libraries | None found that works with httpx2 and is maintained. |
+
+## Test-only material
+
+| Item | Source | Licence | Use |
+|---|---|---|---|
+| `tests/fixtures/telegram/bot_api_spec.json` | [PaulSonOfLars/telegram-bot-api-spec](https://github.com/PaulSonOfLars/telegram-bot-api-spec), Bot API 10.3, reduced to field names and required flags | MIT, Copyright (c) 2020 Paul Larsen | The Telegram fake checks every request the service makes against it. Community-maintained: Telegram publishes no machine-readable spec. Refresh it when the Bot API version in use changes. |
+
+No vendor publishes a mock server or an OpenAPI description, and the HTTP
+mocking libraries (respx, pytest-httpx) do not support httpx2, so the
+vendor fakes in `tests/fakes/` are hand-written on `httpx2.MockTransport`.

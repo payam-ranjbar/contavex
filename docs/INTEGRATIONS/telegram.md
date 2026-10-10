@@ -327,3 +327,19 @@ Library state (not Telegram documentation):
 - https://github.com/go-telegram/bot/releases , https://raw.githubusercontent.com/go-telegram/bot/main/README.md
 - https://github.com/go-telegram-bot-api/telegram-bot-api/releases
 - GitHub REST API (`api.github.com/repos/<owner>/<repo>` and `/releases`) for the repositories above plus mymmrac/telego and tdlib/telegram-bot-api
+
+## Implementation in this service
+
+Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/telegram/bot_api.py`.
+
+| Topic | What the implementation does |
+| --- | --- |
+| Methods used | `sendMessage`, `sendPhoto`, `sendVideo`, `sendDocument`, `sendAnimation`, `sendMediaGroup`, `editMessageText`, `editMessageCaption`, `deleteMessages` |
+| Account settings | `chat_id` (required), `test_environment` (Telegram's test servers), `api_base` (a self-hosted Bot API server) |
+| Uploaded media | Sent as multipart from the service's media store. Media given by URL is passed to Telegram to fetch, except documents |
+| Albums | 2 to 10 items; the caption goes on the first item; one post id per message |
+| Ambiguous send (timeout, connection reset, 5xx, unreadable reply) | Never retried. The publication becomes `outcome_unknown` |
+| Safe to retry | 429 (waits `retry_after`), failure to connect, Telegram failing to fetch a media URL |
+| Edit, delete | Run inside the consumer's request; "not modified" and "message to delete not found" count as success |
+| Not implemented | Paid media, rich messages, explicit `entities`, reply markup, thumbnails, replacing media by edit, splitting text over 4096 characters |
+| Checked how | A stateful fake that validates every request against the Bot API 10.3 field list. Not yet run against Telegram itself |

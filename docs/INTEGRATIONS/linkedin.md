@@ -503,3 +503,20 @@ Non-primary sources (search results only; used solely for the two items marked U
 - https://developers.posteverywhere.ai/platforms/linkedin
 - https://docs.publora.com/raw/platforms/linkedin
 - https://help.oneupapp.io/en-us/article/failed-post-help-1pnirj2/
+
+## Implementation in this service
+
+Added 2026-10-09. The onboarding and the two open questions were researched again before implementation; see `docs/research/testing-and-onboarding.md`, section B.3. Code: `src/content_fleet/providers/linkedin/rest.py`.
+
+| Topic | What the implementation does |
+| --- | --- |
+| API | Versioned `/rest/posts`, `/rest/images`, `/rest/videos`, `/rest/documents` only. The legacy `/v2/ugcPosts` is not implemented; if a self-serve app is refused on `/rest/posts` (403) that fallback has to be added |
+| Account settings | `author` (`urn:li:person:…` or `urn:li:organization:…`, required), `api_version` (default `202609`; review yearly), `api_base`, `oauth_base` |
+| Credentials | `access_token` (required); `client_id` + `client_secret` (to learn the token's expiry); `refresh_token` (used if LinkedIn issued one) |
+| Content | Text; one image, video or document; 2 to 20 images. Media is uploaded as bytes; video in 4 MB parts with progress checkpointed |
+| Text | Plain text is escaped for the "little" format so it renders as written; `#hashtags` stay hashtags. `text_format: "little"` sends the text as is, for mentions |
+| Unconfirmed create | Page author: the author's recent posts are listed and matched on text; found means published, not found twice means it is tried again. Member author, or a Page token without read permission: `outcome_unknown` |
+| Upload URLs | Bytes and the token are only ever sent to a host under `linkedin.com` |
+| Token expiry | With a refresh token: renewed when under 14 days are left. Without: the expiry date is read by token introspection and shown on the account |
+| Not implemented | Articles/link posts, polls, reshares, targeting, video captions and thumbnails, the interactive OAuth flow itself (tokens are obtained with LinkedIn's Token Generator) |
+| Checked how | A stateful fake of the REST API, OAuth endpoints and upload host. Not yet run against LinkedIn itself |

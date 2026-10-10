@@ -3,8 +3,8 @@
 Researched: **2026-10-09**. Sources and the full mechanism comparison:
 [research/docker-and-secrets.md](research/docker-and-secrets.md).
 
-Status: design. Sections marked *(to implement)* describe behaviour the
-foundation phase must deliver and test; nothing here is implemented yet.
+Status: implemented. Each mechanism below names the test that holds it in
+place where there is one.
 
 ## What is being protected
 
@@ -59,7 +59,7 @@ secret managers are.
 Never: vendor tokens in `ARG` or `ENV` (they persist in image history and in
 `mode=max` provenance), or in the build context.
 
-### The seam for secret managers (REQUIREMENTS S-3) *(to implement)*
+### The seam for secret managers (REQUIREMENTS S-3)
 
 All secret access goes through one small interface: *resolve a named secret
 to its value*. The first implementation reads a file. Provider code receives
@@ -79,7 +79,7 @@ chat_id        = "-1001234567890"
 credential     = "telegram_news_bot_token"   # a secret NAME, resolved at runtime
 ```
 
-### File-reading rules *(to implement)*
+### File-reading rules
 
 - Fail fast at startup if a referenced secret is missing, empty or unreadable. The error names the secret, never its content.
 - Trim exactly one trailing `\r\n` or `\n`. A Windows editor or `echo` adds one, and the bind mount preserves it byte for byte.
@@ -108,16 +108,17 @@ encryption and to keep keys apart from the data they protect.
 - The injected initial token is a **seed**. Once the service has refreshed it, the stored token is the truth; a stale seed must never overwrite a newer stored token.
 - **One writer.** Two instances refreshing the same token can invalidate each other. The service runs as a single replica.
 - The volume is **secret-bearing and backup-critical**. Losing it means repeating the manual bootstrap (Instagram) or the browser consent (LinkedIn). Backups of the volume are ciphertext for the token columns, but the master key must be backed up separately.
-- Master-key rotation re-encrypts the stored values; no vendor interaction.
+- There is no re-encryption command yet. Rotating the master key means supplying fresh seed tokens; see Rotation.
+- Each ciphertext is bound to its account and role, so a row copied to another account does not decrypt.
 
 ## Access inside the service
 
 - Credentials are resolved per provider call and passed to that provider only. Telegram code cannot obtain Meta tokens.
-- Credential values are wrapped in a type whose text representation is a fixed placeholder, so accidental formatting or logging prints `***`, not the value. *(to implement)*
+- Credential values are wrapped in a type whose text representation is a fixed placeholder, so accidental formatting or logging prints `***`, not the value.
 - No API endpoint returns a credential. Account endpoints report identity and health (`ok`, `expiring`, `reauthorization_required`, expiry date) only.
 - Consumers authenticate with their own API keys, compared in constant time. Reaching the service on the network is not sufficient to publish.
 
-## Redaction *(to implement, with tests)*
+## Redaction
 
 Defence in depth, because the Telegram token sits in the URL path and Meta
 tokens travel as query parameters:
@@ -128,6 +129,18 @@ tokens travel as query parameters:
 4. **Provider error payloads** are stored and returned only after sanitisation, and only known-safe fields (error code, message, the provider's request/trace id).
 5. **Tests** inject canary credentials and assert they appear in no log line, API response, stored row or error across the success and failure paths.
 
+### Where this is tested
+
+| Guarantee | Test |
+|---|---|
+| A credential echoed back by a vendor never reaches logs, API responses or the database | `test_no_secret_leaks.py`; `test_bot_token_never_leaks`, `test_access_token_never_leaks`, `test_linkedin_credentials_never_leak` |
+| Refreshed tokens are ciphertext at rest; a wrong master key refuses to decrypt | `TestTokenRefresh` in `test_instagram_login.py` |
+| A stale seed never overrides a refreshed token; a new seed does | same |
+| Missing secret, bad account, bad master key, bad staging config stop startup | `TestStartupFailsFast`, `TestStagingConfiguration`, provider `TestValidation` classes |
+| Nothing from the build context is in any image layer; no credential in image config or container environment | `tests/docker/test_docker.py` |
+| An upload URL returned by LinkedIn outside `linkedin.com` gets neither bytes nor token | `test_upload_url_outside_linkedin_is_refused` |
+| The public media listener serves staged files and nothing else | `test_uploaded_image_is_public_only_while_publishing` |
+
 ## Rotation
 
 | Credential | How | Service impact |
@@ -136,7 +149,7 @@ tokens travel as query parameters:
 | Instagram token | Automatic refresh before expiry. If it lapses: generate a new one in the App Dashboard, replace the seed, mark it as newer | Account reports `reauthorization_required`; publications fail fast with a typed error |
 | LinkedIn tokens | Automatic refresh where LinkedIn grants refresh tokens; otherwise browser re-consent before expiry | Same as above, with the expiry date visible ahead of time |
 | Consumer API key | Add the new key, switch the consumer, remove the old key. Two keys may be valid at once. | None |
-| Master key | Re-encrypt command | Brief restart |
+| Master key | Not automated yet. Replace the key and re-supply each account's token as a new seed (a seed that differs from the one a stored token came from always wins) | Restart; Instagram and LinkedIn tokens are re-read from their seed files |
 
 ## Failure behaviour
 
@@ -194,9 +207,10 @@ Only placeholders are ever committed:
 ```
 secrets/
   telegram_news_bot_token.example      contains: REPLACE_WITH_BOT_TOKEN
-  instagram_main_access_token.example  contains: REPLACE_WITH_LONG_LIVED_TOKEN
-  consumer_api_key_app1.example        contains: REPLACE_WITH_RANDOM_32_BYTES
-  master_key.example                   contains: REPLACE_WITH_RANDOM_32_BYTES_BASE64
+  instagram_brand_access_token.example contains: REPLACE_WITH_LONG_LIVED_TOKEN_FROM_META_APP_DASHBOARD
+  consumer_api_key_demo.example        contains: REPLACE_WITH_A_LONG_RANDOM_STRING
+  master_key.example                   contains: REPLACE_WITH_32_RANDOM_BYTES_BASE64
+  s3_access_key_id.example, s3_secret_access_key.example, linkedin_*.example
 ```
 
 Everything else under `secrets/` is git-ignored and excluded from the Docker
