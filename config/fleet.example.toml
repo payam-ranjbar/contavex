@@ -1,0 +1,22 @@
+# Copy to config/fleet.toml and edit. This file is NOT secret: it names
+# secrets but never contains them. Each name below is a file in the secrets
+# directory (./secrets locally, /run/secrets in the container).
+
+# --- Consumers: the applications allowed to call this service -------------
+# Each gets its own API key, sent as "Authorization: Bearer <key>".
+
+[consumers.demo-app]
+api_key = "consumer_api_key_demo"
+
+# --- Accounts: where content can be published ----------------------------
+# Consumers address an account by its id (the part after "accounts.").
+# `platform` + `implementation` select the code that talks to the vendor;
+# changing `implementation` later does not affect consumers.
+
+[accounts.news-channel]
+platform = "telegram"
+implementation = "bot-api"
+# The bot must be an administrator of the channel with "Post messages".
+credentials = { token = "telegram_news_bot_token" }
+# Numeric channel id (-100...) is preferred; "@channelname" works for public channels.
+settings = { chat_id = "-1000000000000" }

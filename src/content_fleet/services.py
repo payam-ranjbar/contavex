@@ -1,0 +1,114 @@
+"""Wires the service together. Fails fast on anything misconfigured."""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from dataclasses import dataclass
+
+import httpx2
+
+from content_fleet.config import ConfigError, FleetConfig, Settings
+from content_fleet.media import MediaStore
+from content_fleet.observability import Metrics
+from content_fleet.providers.registry import ProviderRegistry, default_registry
+from content_fleet.secrets import FileSecretResolver, Secret, SecretResolver
+from content_fleet.staging import Stager
+from content_fleet.store.db import Database
+from content_fleet.worker import Worker
+
+
+@dataclass
+class Services:
+    settings: Settings
+    config: FleetConfig
+    db: Database
+    media: MediaStore
+    registry: ProviderRegistry
+    secrets: SecretResolver
+    consumer_keys: dict[str, Secret]
+    http: httpx2.AsyncClient
+    metrics: Metrics
+    worker: Worker
+    clock: Callable[[], float]
+
+    async def aclose(self) -> None:
+        await self.worker.stop()
+        await self.http.aclose()
+        self.db.close()
+
+
+def build_services(
+    settings: Settings,
+    *,
+    config: FleetConfig | None = None,
+    registry: ProviderRegistry | None = None,
+    secrets: SecretResolver | None = None,
+    transport: httpx2.AsyncBaseTransport | None = None,
+    clock: Callable[[], float] = time.time,
+    stager: Stager | None = None,
+) -> Services:
+    config = config or FleetConfig.load(settings.config_file)
+    registry = registry or default_registry()
+    secrets = secrets or FileSecretResolver(settings.secrets_dir)
+
+    # Every problem an operator can cause is reported at startup, not on the
+    # first publish: unknown providers, bad account settings, missing secrets.
+    for account in config.accounts.values():
+        provider = registry.get(account.platform, account.implementation)
+        if provider is None:
+            raise ConfigError(
+                f"account {account.id!r}: no provider for platform {account.platform!r} "
+                f"implementation {account.implementation!r}; available: {registry.keys()}"
+            )
+        try:
+            provider.validate_account(account)
+        except ValueError as exc:
+            raise ConfigError(f"account {account.id!r}: {exc}") from None
+        for name in account.credentials.values():
+            secrets.get(name)
+    consumer_keys = {
+        consumer.id: secrets.get(consumer.api_key) for consumer in config.consumers.values()
+    }
+
+    db = Database(settings.db_path)
+    media = MediaStore(
+        db,
+        settings.media_dir,
+        max_bytes=settings.max_upload_bytes,
+        retention_seconds=settings.media_retention_seconds,
+        clock=clock,
+    )
+    # No redirects: a provider API has no reason to redirect, and following
+    # one could carry a credential to another host.
+    http = httpx2.AsyncClient(
+        timeout=httpx2.Timeout(settings.provider_timeout_seconds),
+        follow_redirects=False,
+        transport=transport,
+    )
+    metrics = Metrics()
+    worker = Worker(
+        settings=settings,
+        config=config,
+        db=db,
+        registry=registry,
+        secrets=secrets,
+        http=http,
+        media=media,
+        metrics=metrics,
+        clock=clock,
+        stager=stager,
+    )
+    return Services(
+        settings=settings,
+        config=config,
+        db=db,
+        media=media,
+        registry=registry,
+        secrets=secrets,
+        consumer_keys=consumer_keys,
+        http=http,
+        metrics=metrics,
+        worker=worker,
+        clock=clock,
+    )

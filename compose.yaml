@@ -1,0 +1,50 @@
+# NOT YET VERIFIED: written while the Docker daemon was unavailable.
+#
+# Consumers reach the service at http://publisher:8080 on the "content-fleet"
+# network. No host port is published here; see compose.dev.yaml for local use.
+name: content-fleet
+
+services:
+  publisher:
+    build: .
+    image: content-fleet:local
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    user: "10001:10001"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CF_LOG_LEVEL: INFO
+    volumes:
+      - fleet-data:/data
+      - ./config/fleet.toml:/config/fleet.toml:ro
+    # One entry per credential named in config/fleet.toml. Each is mounted
+    # read-only at /run/secrets/<name> and never enters the environment.
+    secrets:
+      - consumer_api_key_demo
+      - telegram_news_bot_token
+    networks:
+      - fleet
+    expose:
+      - "8080"
+
+networks:
+  fleet:
+    name: content-fleet
+
+volumes:
+  # Publication history and uploaded media. Back it up; do not bind-mount it
+  # from a Windows path (SQLite needs real file locking).
+  fleet-data:
+
+secrets:
+  consumer_api_key_demo:
+    file: ./secrets/consumer_api_key_demo
+  telegram_news_bot_token:
+    file: ./secrets/telegram_news_bot_token

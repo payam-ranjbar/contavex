@@ -1,0 +1,22 @@
+# Nothing secret or local may reach the build context.
+.git
+.gitignore
+secrets/
+.env
+.env.*
+data/
+docs/
+tests/
+*.md
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+.idea/
+.vscode/
+!README.md

@@ -1,0 +1,48 @@
+# --- Secrets: never commit ---------------------------------------------
+# Real secret material lives only under secrets/ (git-ignored) or in an
+# external secret manager. Only *.example placeholders are tracked.
+/secrets/*
+!/secrets/.gitkeep
+!/secrets/*.example
+!/secrets/README.md
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Runtime data ------------------------------------------------------
+/data/
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# --- Tooling -----------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+node_modules/
+dist/
+build/
+*.egg-info/
+
+# --- Editors / OS ------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Operator-specific; config/fleet.example.toml is the tracked template.
+/config/fleet.toml

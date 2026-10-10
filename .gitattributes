@@ -1,0 +1,8 @@
+# Keep LF everywhere: files are copied into Linux images, and a CRLF in a
+# shell script or a mounted secret file breaks at runtime.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.mp4 binary
+*.pdf binary

@@ -1,0 +1,8 @@
+# Local development overlay: reach the API from the host, on loopback only.
+#   docker compose -f compose.yaml -f compose.dev.yaml up --build
+services:
+  publisher:
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      CF_LOG_LEVEL: DEBUG
