@@ -37,6 +37,7 @@ from content_fleet.core.models import (
 )
 from content_fleet.credentials import CredentialState, RefreshedCredential
 from content_fleet.observability import log
+from content_fleet.providers import http
 from content_fleet.providers.base import (
     Continue,
     Done,
@@ -45,6 +46,7 @@ from content_fleet.providers.base import (
     StepOutcome,
     Unknown,
 )
+from content_fleet.providers.http import Ambiguous
 from content_fleet.secrets import Secret
 
 MB = 1024 * 1024
@@ -85,10 +87,6 @@ class InstagramOptions(BaseModel):
     thumb_offset_ms: int | None = Field(
         default=None, ge=0, description="Reels only: frame to use as the cover."
     )
-
-
-class _Ambiguous(Exception):
-    """The request may have reached Meta, and we do not know the result."""
 
 
 def _poll_delay(polls: int) -> float:
@@ -330,7 +328,7 @@ class InstagramLogin(Provider):
                 json={"creation_id": state["container"]},
                 ambiguous=True,
             )
-        except _Ambiguous:
+        except Ambiguous:
             return await self._recover(ctx, request, state)
         except PublishError as exc:
             if exc.provider_code == str(NOT_READY):
@@ -501,7 +499,7 @@ class InstagramLogin(Provider):
         """Call the Graph API. `operation` is what gets logged, never the URL.
 
         With `ambiguous=True` a failure that leaves the outcome open raises
-        `_Ambiguous`; otherwise it is an ordinary retryable error.
+        `Ambiguous`; otherwise it is an ordinary retryable error.
         """
         if path.startswith("https://"):
             url = path
@@ -516,25 +514,19 @@ class InstagramLogin(Provider):
         started = time.perf_counter()
 
         def open_outcome(category: ErrorCategory, what: str) -> Exception:
-            return _Ambiguous(what) if ambiguous else PublishError(category, f"Instagram {what}")
+            return http.open_outcome("Instagram", ambiguous, category, what)
 
-        try:
-            response = await ctx.http.request(
-                method, url, params=params, json=json, headers=headers
-            )
-        except (httpx2.ConnectError, httpx2.ConnectTimeout) as exc:
-            log.warning("instagram_request", operation=operation, outcome=type(exc).__name__)
-            raise PublishError(
-                ErrorCategory.PROVIDER_UNAVAILABLE, "could not connect to Instagram"
-            ) from None
-        except httpx2.TimeoutException as exc:
-            log.warning("instagram_request", operation=operation, outcome=type(exc).__name__)
-            raise open_outcome(ErrorCategory.TIMEOUT, "did not respond in time") from None
-        except httpx2.TransportError as exc:
-            log.warning("instagram_request", operation=operation, outcome=type(exc).__name__)
-            raise open_outcome(
-                ErrorCategory.PROVIDER_UNAVAILABLE, "connection failed mid-request"
-            ) from None
+        response = await http.send(
+            ctx.http,
+            method,
+            url,
+            vendor="Instagram",
+            operation=operation,
+            ambiguous=ambiguous,
+            params=params,
+            json=json,
+            headers=headers,
+        )
 
         status = response.status_code
         try:

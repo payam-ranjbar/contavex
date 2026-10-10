@@ -18,7 +18,6 @@ import time
 from contextlib import ExitStack
 from typing import Any, Literal
 
-import httpx2
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from content_fleet.config import AccountConfig
@@ -33,7 +32,9 @@ from content_fleet.core.models import (
     PublishedPost,
 )
 from content_fleet.observability import log
+from content_fleet.providers import http
 from content_fleet.providers.base import Done, Provider, ProviderContext, StepOutcome, Unknown
+from content_fleet.providers.http import Ambiguous, open_outcome
 
 MB = 1024 * 1024
 DEFAULT_API_BASE = "https://api.telegram.org"
@@ -64,10 +65,6 @@ class TelegramOptions(BaseModel):
     disable_link_preview: bool = False
     show_caption_above_media: bool = False
     parse_mode: Literal["HTML", "MarkdownV2"] | None = None
-
-
-class _Ambiguous(Exception):
-    """The request may have reached Telegram, and we do not know the result."""
 
 
 class TelegramBotApi(Provider):
@@ -195,7 +192,7 @@ class TelegramBotApi(Provider):
 
             try:
                 result = await self._call(ctx, method, params, uploads, send=True)
-            except _Ambiguous as exc:
+            except Ambiguous as exc:
                 return Unknown(
                     f"Telegram did not confirm the post ({exc}); it may or may not have "
                     "been published, and the Bot API offers no way to check"
@@ -278,7 +275,7 @@ class TelegramBotApi(Provider):
         """Call one Bot API method.
 
         `send` marks a call that creates a post: for those, any failure after
-        the request may have reached Telegram raises `_Ambiguous` instead of
+        the request may have reached Telegram raises `Ambiguous` instead of
         a retryable error. Edits and deletes converge, so they just retry.
         """
         base = str(ctx.account.settings.get("api_base", DEFAULT_API_BASE)).rstrip("/")
@@ -286,52 +283,40 @@ class TelegramBotApi(Provider):
         started = time.perf_counter()
 
         def ambiguous_or(category: ErrorCategory, what: str) -> Exception:
-            return _Ambiguous(what) if send else PublishError(category, f"Telegram {what}")
+            return open_outcome("Telegram", send, category, what)
 
-        try:
-            if uploads:
-                # Multipart fields are strings; structured values travel as JSON.
-                fields = {
-                    key: value if isinstance(value, str) else json.dumps(value)
-                    for key, value in params.items()
-                }
-                response = await ctx.http.post(url, data=fields, files=uploads)
-            else:
-                response = await ctx.http.post(url, json=params)
-        except (httpx2.ConnectError, httpx2.ConnectTimeout) as exc:
-            # Nothing was sent, so this is safe to retry even for a send.
-            log.warning("telegram_request", method=method, outcome=type(exc).__name__)
-            raise PublishError(
-                ErrorCategory.PROVIDER_UNAVAILABLE, "could not connect to Telegram"
-            ) from None
-        except httpx2.TimeoutException as exc:
-            log.warning("telegram_request", method=method, outcome=type(exc).__name__)
-            raise ambiguous_or(ErrorCategory.TIMEOUT, "did not respond in time") from None
-        except httpx2.TransportError as exc:
-            log.warning("telegram_request", method=method, outcome=type(exc).__name__)
-            raise ambiguous_or(
-                ErrorCategory.PROVIDER_UNAVAILABLE, "connection failed mid-request"
-            ) from None
+        if uploads:
+            # Multipart fields are strings; structured values travel as JSON.
+            fields = {
+                key: value if isinstance(value, str) else json.dumps(value)
+                for key, value in params.items()
+            }
+            body: dict[str, Any] = {"data": fields, "files": uploads}
+        else:
+            body = {"json": params}
+        response = await http.send(
+            ctx.http, "POST", url, vendor="Telegram", operation=method, ambiguous=send, **body
+        )
 
         status = response.status_code
         log.info(
             "telegram_request",
-            method=method,
+            operation=method,
             status=status,
             duration_ms=round((time.perf_counter() - started) * 1000, 1),
         )
         try:
-            body = response.json()
-            ok, description = body["ok"], str(body.get("description", ""))
-            parameters = body.get("parameters") or {}
-            result = body.get("result")
+            reply = response.json()
+            ok, description = reply["ok"], str(reply.get("description", ""))
+            parameters = reply.get("parameters") or {}
+            result = reply.get("result")
         except ValueError, KeyError, TypeError, AttributeError:
             if status < 300 or status >= 500:
                 raise ambiguous_or(
                     ErrorCategory.MALFORMED_PROVIDER_RESPONSE,
                     f"returned an unreadable response (HTTP {status})",
                 ) from None
-            body, ok, description, parameters, result = {}, False, "", {}, None
+            reply, ok, description, parameters, result = {}, False, "", {}, None
 
         if ok is True and result is not None:
             return result
@@ -340,7 +325,7 @@ class TelegramBotApi(Provider):
                 ErrorCategory.MALFORMED_PROVIDER_RESPONSE, "reported success without a result"
             )
 
-        code = body.get("error_code", status)
+        code = reply.get("error_code", status)
         lowered = description.lower()
         fail = _Failure(str(code), description or f"HTTP {status}")
         if code == 429:

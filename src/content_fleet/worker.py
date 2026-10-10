@@ -171,7 +171,9 @@ class Worker:
                 account=account.id, platform=account.platform
             ):
                 try:
-                    for role in provider.mutable_credentials:
+                    # A provider may declare roles an account does not use
+                    # (a refresh token, say).
+                    for role in provider.mutable_credentials & set(account.credentials):
                         self._credentials.first_seen(account, role)
                     refreshed = await provider.refresh_credentials(
                         self.context_for(account, "credential-maintenance"),
@@ -377,10 +379,12 @@ class Worker:
         if now + delay > record.deadline:
             self._fail(record, exc)
             return
+        # The step may have checkpointed progress before failing; keep it.
+        current = self._db.get_publication(record.id)
         self._db.save_progress(
             record.id,
             now=now,
-            state=record.state,
+            state=current.state if current else record.state,
             run_after=now + delay,
             attempts=attempt,
             error=_error_info(exc, retryable=True),

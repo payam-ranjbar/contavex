@@ -20,6 +20,7 @@ import pytest
 from content_fleet.config import FleetConfig
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes import instagram as ig
+from tests.fakes import linkedin as li
 from tests.fakes import telegram as tg
 
 pytestmark = [pytest.mark.contract, pytest.mark.anyio]
@@ -142,7 +143,49 @@ class InstagramLoginDriver(Driver):
         self.fake.plan("create_container", ig.graph_error(100, "Invalid parameter"))
 
 
-DRIVERS: list[type[Driver]] = [TelegramBotApiDriver, InstagramLoginDriver]
+class LinkedInRestDriver(Driver):
+    platform = "linkedin"
+    implementation = "rest"
+    account_settings = {"author": li.ORGANIZATION}  # noqa: RUF012
+    credentials = {"access_token": "vendor_credential"}  # noqa: RUF012
+    secrets = {  # noqa: RUF012
+        "vendor_credential": li.TOKEN,
+        "master_key": base64.b64encode(bytes(range(32))).decode(),
+    }
+    credential = li.TOKEN
+    extra_config = {"service": {"master_key": "master_key"}}  # noqa: RUF012
+
+    def __init__(self) -> None:
+        self.fake = li.FakeLinkedIn()
+
+    def transport(self) -> httpx2.AsyncBaseTransport:
+        return self.fake.transport()
+
+    def body(self, text: str) -> dict[str, Any]:
+        return {"text": text}
+
+    def vendor_calls(self) -> int:
+        return len(self.fake.calls)
+
+    def posts_at_vendor(self) -> int:
+        return len(self.fake.posts)
+
+    def reject_credentials(self) -> None:
+        self.fake.plan("create_post", li.li_error(401, "The token has been revoked"))
+
+    def rate_limit(self, seconds: int) -> None:
+        response = li.li_error(429, "Resource level throttle limit reached")
+        response.headers["retry-after"] = str(seconds)
+        self.fake.plan("create_post", response)
+
+    def unreachable(self) -> None:
+        self.fake.plan("create_post", httpx2.ConnectError("unreachable"))
+
+    def reject_content(self) -> None:
+        self.fake.plan("create_post", li.li_error(400, "Invalid value", "INVALID_VALUE_FOR_FIELD"))
+
+
+DRIVERS: list[type[Driver]] = [TelegramBotApiDriver, InstagramLoginDriver, LinkedInRestDriver]
 
 
 @pytest.fixture(params=DRIVERS, ids=lambda d: f"{d.platform}/{d.implementation}")
