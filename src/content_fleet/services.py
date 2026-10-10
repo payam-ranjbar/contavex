@@ -9,11 +9,13 @@ from dataclasses import dataclass
 import httpx2
 
 from content_fleet.config import ConfigError, FleetConfig, Settings
+from content_fleet.credentials import CredentialStore
 from content_fleet.media import MediaStore
 from content_fleet.observability import Metrics
 from content_fleet.providers.registry import ProviderRegistry, default_registry
 from content_fleet.secrets import FileSecretResolver, Secret, SecretResolver
 from content_fleet.staging import Stager
+from content_fleet.staging.registry import build_stager
 from content_fleet.store.db import Database
 from content_fleet.worker import Worker
 
@@ -31,6 +33,8 @@ class Services:
     metrics: Metrics
     worker: Worker
     clock: Callable[[], float]
+    credentials: CredentialStore
+    stager: Stager | None
 
     async def aclose(self) -> None:
         await self.worker.stop()
@@ -49,8 +53,8 @@ def build_services(
     stager: Stager | None = None,
 ) -> Services:
     config = config or FleetConfig.load(settings.config_file)
-    registry = registry or default_registry()
     secrets = secrets or FileSecretResolver(settings.secrets_dir)
+    registry = registry or default_registry(staging_available=config.staging is not None)
 
     # Every problem an operator can cause is reported at startup, not on the
     # first publish: unknown providers, bad account settings, missing secrets.
@@ -67,11 +71,49 @@ def build_services(
             raise ConfigError(f"account {account.id!r}: {exc}") from None
         for name in account.credentials.values():
             secrets.get(name)
+        if provider.mutable_credentials and config.service.master_key is None:
+            raise ConfigError(
+                f"account {account.id!r}: its credentials are refreshed at runtime and must "
+                "be stored encrypted; set [service] master_key to the name of a secret "
+                "holding 32 random bytes, base64-encoded"
+            )
+    master_key = secrets.get(config.service.master_key) if config.service.master_key else None
     consumer_keys = {
         consumer.id: secrets.get(consumer.api_key) for consumer in config.consumers.values()
     }
 
     db = Database(settings.db_path)
+    try:
+        return _assemble(
+            settings,
+            config,
+            registry,
+            secrets,
+            consumer_keys,
+            master_key,
+            db,
+            transport,
+            clock,
+            stager,
+        )
+    except BaseException:
+        # Startup failed after the database was opened; do not leave it open.
+        db.close()
+        raise
+
+
+def _assemble(
+    settings: Settings,
+    config: FleetConfig,
+    registry: ProviderRegistry,
+    secrets: SecretResolver,
+    consumer_keys: dict[str, Secret],
+    master_key: Secret | None,
+    db: Database,
+    transport: httpx2.AsyncBaseTransport | None,
+    clock: Callable[[], float],
+    stager: Stager | None,
+) -> Services:
     media = MediaStore(
         db,
         settings.media_dir,
@@ -87,12 +129,17 @@ def build_services(
         transport=transport,
     )
     metrics = Metrics()
+    credentials = CredentialStore(db, secrets, clock, master_key)
+    if stager is None:
+        stager = build_stager(
+            config.staging, db=db, media=media, http=http, secrets=secrets, clock=clock
+        )
     worker = Worker(
         settings=settings,
         config=config,
         db=db,
         registry=registry,
-        secrets=secrets,
+        credentials=credentials,
         http=http,
         media=media,
         metrics=metrics,
@@ -111,4 +158,6 @@ def build_services(
         metrics=metrics,
         worker=worker,
         clock=clock,
+        credentials=credentials,
+        stager=stager,
     )

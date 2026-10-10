@@ -38,6 +38,9 @@ class Settings(BaseModel):
     worker_poll_seconds: float = Field(default=1.0, gt=0)
     # Upper bound for one provider step, uploads included.
     provider_timeout_seconds: float = Field(default=120.0, gt=0)
+    # Listener for the self-hosted media stager; the only port meant to be
+    # reachable from the internet (through the operator's TLS proxy).
+    public_port: int = Field(default=8081, ge=1, le=65535)
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> Settings:
@@ -80,11 +83,30 @@ class ConsumerConfig(BaseModel):
     api_key: str  # a secret NAME
 
 
+class StagingConfig(BaseModel):
+    """How uploaded media is made publicly reachable for providers that fetch by URL."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    strategy: str = Field(pattern=_ID)
+    credentials: dict[str, str] = {}  # role -> secret name
+    settings: dict[str, Any] = {}
+
+
+class ServiceConfig(BaseModel):
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    # Secret NAME of the key that encrypts refreshed credentials at rest.
+    master_key: str | None = None
+
+
 class FleetConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     accounts: dict[str, AccountConfig]
     consumers: dict[str, ConsumerConfig]
+    service: ServiceConfig = ServiceConfig()
+    staging: StagingConfig | None = None
 
     @classmethod
     def load(cls, path: Path) -> FleetConfig:
@@ -98,7 +120,7 @@ class FleetConfig(BaseModel):
 
     @classmethod
     def parse(cls, raw: Mapping[str, Any]) -> FleetConfig:
-        unknown = set(raw) - {"accounts", "consumers"}
+        unknown = set(raw) - {"accounts", "consumers", "service", "staging"}
         if unknown:
             raise ConfigError(f"unknown top-level config sections: {sorted(unknown)}")
         try:
@@ -110,8 +132,10 @@ class FleetConfig(BaseModel):
                 key: ConsumerConfig(id=key, **value)
                 for key, value in raw.get("consumers", {}).items()
             }
+            service = ServiceConfig(**raw.get("service", {}))
+            staging = StagingConfig(**raw["staging"]) if "staging" in raw else None
         except (ValidationError, TypeError) as exc:
             raise ConfigError(f"invalid fleet config: {exc}") from None
         if not consumers:
             raise ConfigError("at least one [consumers.<id>] entry is required")
-        return cls(accounts=accounts, consumers=consumers)
+        return cls(accounts=accounts, consumers=consumers, service=service, staging=staging)

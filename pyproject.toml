@@ -12,6 +12,7 @@ dependencies = [
     "httpx2==2.13.1",
     "structlog==26.1.0",
     "prometheus-client==0.26.0",
+    "cryptography==50.0.2",
 ]
 
 [dependency-groups]

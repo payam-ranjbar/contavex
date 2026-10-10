@@ -3,11 +3,14 @@
 Each implementation is exercised through the public API against a fake of
 its vendor. A new implementation joins by adding a `Driver` to `DRIVERS`;
 it then has to pass every test here for each capability it declares. This is
-what keeps "one platform, several implementations" interchangeable.
+what keeps "one platform, several implementations" interchangeable, and it
+is why none of these tests mentions a vendor.
 """
 
 from __future__ import annotations
 
+import base64
+import json
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -15,9 +18,9 @@ import httpx2
 import pytest
 
 from content_fleet.config import FleetConfig
-from content_fleet.providers.registry import default_registry
 from tests.conftest import Harness, HarnessFactory
-from tests.fakes.telegram import CHAT_ID, TOKEN, FakeTelegram
+from tests.fakes import instagram as ig
+from tests.fakes import telegram as tg
 
 pytestmark = [pytest.mark.contract, pytest.mark.anyio]
 
@@ -28,14 +31,24 @@ class Driver(ABC):
     platform: str
     implementation: str
     account_settings: dict[str, Any]
-    secrets: dict[str, str]  # secret name -> value; the first is the account credential
     credentials: dict[str, str]  # role -> secret name
+    secrets: dict[str, str]  # secret name -> value
+    credential: str  # the vendor credential value, to check it never leaks
+    extra_config: dict[str, Any] = {}  # noqa: RUF012
 
     @abstractmethod
     def transport(self) -> httpx2.AsyncBaseTransport: ...
 
     @abstractmethod
+    def body(self, text: str) -> dict[str, Any]:
+        """The simplest publication this implementation supports."""
+
+    @abstractmethod
     def vendor_calls(self) -> int: ...
+
+    @abstractmethod
+    def posts_at_vendor(self) -> int:
+        """How many posts the vendor actually holds."""
 
     @abstractmethod
     def reject_credentials(self) -> None: ...
@@ -53,18 +66,25 @@ class Driver(ABC):
 class TelegramBotApiDriver(Driver):
     platform = "telegram"
     implementation = "bot-api"
-    account_settings = {"chat_id": str(CHAT_ID)}  # noqa: RUF012
-    secrets = {"vendor_credential": TOKEN}  # noqa: RUF012
+    account_settings = {"chat_id": str(tg.CHAT_ID)}  # noqa: RUF012
     credentials = {"token": "vendor_credential"}  # noqa: RUF012
+    secrets = {"vendor_credential": tg.TOKEN}  # noqa: RUF012
+    credential = tg.TOKEN.split(":")[1]
 
     def __init__(self) -> None:
-        self.fake = FakeTelegram()
+        self.fake = tg.FakeTelegram()
 
     def transport(self) -> httpx2.AsyncBaseTransport:
         return self.fake.transport()
 
+    def body(self, text: str) -> dict[str, Any]:
+        return {"text": text}
+
     def vendor_calls(self) -> int:
         return len(self.fake.calls)
+
+    def posts_at_vendor(self) -> int:
+        return self.fake.posts
 
     def reject_credentials(self) -> None:
         self.fake.reply(self.fake.error(401, "Unauthorized"))
@@ -79,7 +99,50 @@ class TelegramBotApiDriver(Driver):
         self.fake.reply(self.fake.error(400, "Bad Request: can't parse entities"))
 
 
-DRIVERS: list[type[Driver]] = [TelegramBotApiDriver]
+class InstagramLoginDriver(Driver):
+    platform = "instagram"
+    implementation = "instagram-login"
+    account_settings = {"ig_user_id": ig.IG_USER_ID}  # noqa: RUF012
+    credentials = {"access_token": "vendor_credential"}  # noqa: RUF012
+    secrets = {  # noqa: RUF012
+        "vendor_credential": ig.TOKEN,
+        "master_key": base64.b64encode(bytes(range(32))).decode(),
+    }
+    credential = ig.TOKEN
+    extra_config = {"service": {"master_key": "master_key"}}  # noqa: RUF012
+
+    def __init__(self) -> None:
+        self.fake = ig.FakeInstagram()
+
+    def transport(self) -> httpx2.AsyncBaseTransport:
+        return self.fake.transport()
+
+    def body(self, text: str) -> dict[str, Any]:
+        return {"text": text, "media": [{"type": "image", "url": "https://cdn.example/a.jpg"}]}
+
+    def vendor_calls(self) -> int:
+        return len(self.fake.calls)
+
+    def posts_at_vendor(self) -> int:
+        return len(self.fake.media)
+
+    def reject_credentials(self) -> None:
+        self.fake.plan("create_container", ig.graph_error(190, "Token expired", subcode=463))
+
+    def rate_limit(self, seconds: int) -> None:
+        usage = {ig.IG_USER_ID: [{"estimated_time_to_regain_access": seconds / 60}]}
+        response = ig.graph_error(80002, "Too many calls")
+        response.headers["x-business-use-case-usage"] = json.dumps(usage)
+        self.fake.plan("create_container", response)
+
+    def unreachable(self) -> None:
+        self.fake.plan("create_container", httpx2.ConnectError("unreachable"))
+
+    def reject_content(self) -> None:
+        self.fake.plan("create_container", ig.graph_error(100, "Invalid parameter"))
+
+
+DRIVERS: list[type[Driver]] = [TelegramBotApiDriver, InstagramLoginDriver]
 
 
 @pytest.fixture(params=DRIVERS, ids=lambda d: f"{d.platform}/{d.implementation}")
@@ -100,13 +163,11 @@ async def h(harness_factory: HarnessFactory, driver: Driver) -> Harness:
                     "settings": driver.account_settings,
                 }
             },
+            **driver.extra_config,
         }
     )
     return await harness_factory(
-        config=config,
-        registry=default_registry(),
-        transport=driver.transport(),
-        secrets=driver.secrets,
+        config=config, transport=driver.transport(), secrets=driver.secrets
     )
 
 
@@ -116,9 +177,9 @@ async def capabilities(h: Harness) -> dict[str, Any]:
     return response.json()["capabilities"]  # type: ignore[no-any-return]
 
 
-async def settle(h: Harness, publication_id: str, *, minutes: int = 30) -> dict[str, Any]:
+async def settle(h: Harness, publication_id: str, *, rounds: int = 60) -> dict[str, Any]:
     """Let the worker run through polls and backoffs until the outcome is final."""
-    for _ in range(minutes):
+    for _ in range(rounds):
         await h.drain()
         status = await h.status(publication_id)
         if status["next_attempt_at"] is None:
@@ -127,8 +188,8 @@ async def settle(h: Harness, publication_id: str, *, minutes: int = 30) -> dict[
     raise AssertionError("publication did not settle")
 
 
-async def publish_text(h: Harness, text: str = "contract test", key: str = "k1") -> dict[str, Any]:
-    response = await h.submit(text=text, key=key)
+async def publish(h: Harness, driver: Driver, key: str = "k1") -> dict[str, Any]:
+    response = await h.submit(driver.body("contract test"), key=key)
     assert response.status_code == 202, response.text
     return await settle(h, response.json()["id"])
 
@@ -146,52 +207,75 @@ async def test_capabilities_are_self_consistent(h: Harness) -> None:
 async def test_submission_is_accepted_before_the_vendor_is_called(
     h: Harness, driver: Driver
 ) -> None:
-    response = await h.submit(text="contract test")
+    response = await h.submit(driver.body("contract test"))
     assert response.status_code == 202
     assert response.json()["status"] == "accepted"
     assert driver.vendor_calls() == 0
 
 
-async def test_text_post_is_published_with_a_post_id(h: Harness) -> None:
-    caps = await capabilities(h)
-    if caps["kinds"].get("post", {}).get("min_media", 1) > 0:
-        pytest.skip("this account cannot publish text-only posts")
-    publication = await publish_text(h)
+async def test_publication_ends_published_with_a_post_id(h: Harness, driver: Driver) -> None:
+    publication = await publish(h, driver)
     assert publication["status"] == "published"
     assert publication["error"] is None
     assert publication["result"]["posts"] and publication["result"]["posts"][0]["id"]
+    assert driver.posts_at_vendor() == 1
 
 
 async def test_retrying_the_same_request_does_not_publish_twice(h: Harness, driver: Driver) -> None:
-    first = await publish_text(h, key="same")
+    first = await publish(h, driver, key="same")
     calls = driver.vendor_calls()
-    again = await h.submit(text="contract test", key="same")
+    again = await h.submit(driver.body("contract test"), key="same")
     await h.drain()
     assert again.json()["id"] == first["id"]
     assert driver.vendor_calls() == calls
+    assert driver.posts_at_vendor() == 1
 
 
 async def test_text_over_the_declared_limit_is_refused_up_front(h: Harness, driver: Driver) -> None:
-    limit = (await capabilities(h))["max_text_length"]
-    if limit is None:
-        pytest.skip("no declared text limit")
-    response = await h.submit(text="x" * (limit + 1))
+    caps = await capabilities(h)
+    body = driver.body("x")
+    limit = caps["max_caption_length" if body.get("media") else "max_text_length"]
+    assert limit is not None, "implementations must declare the limit for their default post"
+    response = await h.submit(driver.body("x" * (limit + 1)))
     assert response.status_code == 422
     assert response.json()["type"].endswith(":unsupported-capability")
     assert driver.vendor_calls() == 0
 
 
+async def test_unsupported_kind_is_refused_up_front(h: Harness, driver: Driver) -> None:
+    response = await h.submit(driver.body("x") | {"kind": "no-such-kind"})
+    assert response.status_code == 422
+    assert response.json()["capability"] == "kind:no-such-kind"
+    assert driver.vendor_calls() == 0
+
+
 async def test_rejected_credentials_fail_permanently(h: Harness, driver: Driver) -> None:
     driver.reject_credentials()
-    publication = await publish_text(h)
+    publication = await publish(h, driver)
     assert publication["status"] == "failed"
     assert publication["error"]["category"] == "authentication"
     assert publication["error"]["retryable"] is False
+    assert driver.posts_at_vendor() == 0
+
+
+async def test_rejected_credentials_take_the_account_out_of_service(
+    h: Harness, driver: Driver
+) -> None:
+    driver.reject_credentials()
+    await publish(h, driver, key="first")
+    calls = driver.vendor_calls()
+
+    account = (await h.client.get("/v1/accounts/main", headers=h.auth())).json()
+    assert account["credential_status"] == "reauthorization_required"
+    refused = await h.submit(driver.body("contract test"), key="second")
+    assert refused.status_code == 409
+    assert refused.json()["type"].endswith(":account-unavailable")
+    assert driver.vendor_calls() == calls
 
 
 async def test_rejected_content_fails_permanently(h: Harness, driver: Driver) -> None:
     driver.reject_content()
-    publication = await publish_text(h)
+    publication = await publish(h, driver)
     assert publication["status"] == "failed"
     assert publication["error"]["retryable"] is False
     calls = driver.vendor_calls()
@@ -201,32 +285,37 @@ async def test_rejected_content_fails_permanently(h: Harness, driver: Driver) ->
 
 
 async def test_rate_limit_is_waited_out_not_failed(h: Harness, driver: Driver) -> None:
-    driver.rate_limit(90)
-    response = await h.submit(text="contract test")
-    await h.drain()
-    waiting = await h.status(response.json()["id"])
+    driver.rate_limit(600)
+    response = await h.submit(driver.body("contract test"))
+    publication_id = response.json()["id"]
+    for _ in range(5):  # reach the throttled call, whatever steps come before it
+        await h.drain()
+        waiting = await h.status(publication_id)
+        if waiting["error"]:
+            break
+        h.clock.advance(5)
     assert waiting["status"] == "processing"
     assert waiting["error"]["category"] == "rate_limited"
 
     calls = driver.vendor_calls()
-    h.clock.advance(89)
+    h.clock.advance(590)
     await h.drain()
     assert driver.vendor_calls() == calls, "retried before the vendor's hint elapsed"
 
-    h.clock.advance(5)
-    assert (await settle(h, response.json()["id"]))["status"] == "published"
+    h.clock.advance(15)
+    assert (await settle(h, publication_id))["status"] == "published"
+    assert driver.posts_at_vendor() == 1
 
 
 async def test_unreachable_vendor_is_retried(h: Harness, driver: Driver) -> None:
     driver.unreachable()
-    response = await h.submit(text="contract test")
-    await h.drain()
-    assert (await h.status(response.json()["id"]))["status"] == "processing"
-    assert (await settle(h, response.json()["id"]))["status"] == "published"
+    publication = await publish(h, driver)
+    assert publication["status"] == "published"
+    assert driver.posts_at_vendor() == 1
 
 
-async def test_delete_matches_the_declared_capability(h: Harness) -> None:
-    publication = await publish_text(h)
+async def test_delete_matches_the_declared_capability(h: Harness, driver: Driver) -> None:
+    publication = await publish(h, driver)
     response = await h.client.delete(f"/v1/publications/{publication['id']}", headers=h.auth())
     if (await capabilities(h))["deletable"]:
         assert response.status_code == 200
@@ -237,8 +326,8 @@ async def test_delete_matches_the_declared_capability(h: Harness) -> None:
         assert (await h.status(publication["id"]))["status"] == "published"
 
 
-async def test_edit_matches_the_declared_capability(h: Harness) -> None:
-    publication = await publish_text(h)
+async def test_edit_matches_the_declared_capability(h: Harness, driver: Driver) -> None:
+    publication = await publish(h, driver)
     response = await h.client.patch(
         f"/v1/publications/{publication['id']}", json={"text": "edited"}, headers=h.auth()
     )
@@ -250,11 +339,8 @@ async def test_edit_matches_the_declared_capability(h: Harness) -> None:
 
 
 async def test_vendor_credential_is_not_visible_to_consumers(h: Harness, driver: Driver) -> None:
+    ok = await publish(h, driver, key="b")
     driver.reject_credentials()
-    failed = await publish_text(h, key="a")
-    ok = await publish_text(h, key="b")
+    failed = await publish(h, driver, key="a")
     accounts = await h.client.get("/v1/accounts", headers=h.auth())
-    credential = next(iter(driver.secrets.values()))
-    visible = f"{failed} {ok} {accounts.text}"
-    assert credential not in visible
-    assert credential.split(":")[-1] not in visible
+    assert driver.credential not in f"{failed} {ok} {accounts.text}"

@@ -281,7 +281,14 @@ class TestReading:
         (account,) = response.json()
         assert account["id"] == "main" and account["platform"] == "fake"
         assert account["capabilities"]["kinds"]["post"]["max_media"] == 2
-        assert set(account) == {"id", "platform", "capabilities"}
+        assert set(account) == {
+            "id",
+            "platform",
+            "capabilities",
+            "credential_status",
+            "credential_expires_at",
+        }
+        assert account["credential_status"] == "ok"
         assert "fake_token" not in response.text  # not even the secret's name
 
         missing = await harness.client.get("/v1/accounts/nope", headers=harness.auth())

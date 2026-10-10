@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from content_fleet.providers.base import Provider
+from content_fleet.providers.instagram.instagram_login import InstagramLogin
 from content_fleet.providers.telegram.bot_api import TelegramBotApi
 
 
@@ -32,7 +33,12 @@ class ProviderRegistry:
         return sorted(self._providers)
 
 
-def default_registry() -> ProviderRegistry:
+def default_registry(*, staging_available: bool = False) -> ProviderRegistry:
     # To add a platform or a second implementation of one: write the
     # Provider subclass and list it here.
-    return ProviderRegistry([TelegramBotApi()])
+    return ProviderRegistry(
+        [
+            TelegramBotApi(),
+            InstagramLogin(staging_available=staging_available),
+        ]
+    )

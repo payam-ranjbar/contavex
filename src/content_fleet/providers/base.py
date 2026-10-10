@@ -20,6 +20,7 @@ from content_fleet.config import AccountConfig
 from content_fleet.core.capabilities import Capabilities
 from content_fleet.core.errors import ErrorCategory, PublishError
 from content_fleet.core.models import PublicationRequest, PublicationResult
+from content_fleet.credentials import CredentialState, RefreshedCredential
 from content_fleet.media import MediaStore
 from content_fleet.secrets import Secret
 from content_fleet.staging import Stager
@@ -71,6 +72,9 @@ class Provider(ABC):
 
     platform: str
     implementation: str
+    # Credential roles this provider replaces at runtime (refreshed tokens).
+    # Non-empty means the service needs a master key to store them.
+    mutable_credentials: frozenset[str] = frozenset()
 
     @abstractmethod
     def capabilities(self, account: AccountConfig) -> Capabilities: ...
@@ -99,6 +103,13 @@ class Provider(ABC):
         """After an interrupted non-repeatable step, find out what happened.
         Return None when the provider offers no way to tell."""
         return None
+
+    async def refresh_credentials(
+        self, ctx: ProviderContext, states: dict[str, CredentialState], now: float
+    ) -> list[RefreshedCredential]:
+        """Called about hourly. Return replacements for credentials that are
+        due for refresh; an empty list when nothing is due."""
+        return []
 
     async def delete(self, ctx: ProviderContext, result: PublicationResult) -> None:
         raise PublishError(ErrorCategory.UNSUPPORTED, "this account cannot delete posts")

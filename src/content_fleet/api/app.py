@@ -9,7 +9,7 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import structlog
 from fastapi import Depends, FastAPI, Header, Query, Request, Response
@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from content_fleet import __version__
@@ -42,6 +42,7 @@ from content_fleet.services import Services
 from content_fleet.store.db import DuplicateIdempotencyKey, MediaRecord, PublicationRecord
 
 PROBLEM_JSON = "application/problem+json"
+EXPIRY_WARNING_SECONDS = 10 * 86400
 _REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 _TRACEPARENT = re.compile(r"^[0-9a-f]{2}-([0-9a-f]{32})-[0-9a-f]{16}-[0-9a-f]{2}$")
 _IDEMPOTENCY_KEY = re.compile(r"^[\x21-\x7e]{1,255}$")
@@ -61,6 +62,14 @@ class Account(BaseModel):
     id: str
     platform: str
     capabilities: Capabilities
+    credential_status: Literal["ok", "expiring", "reauthorization_required"] = Field(
+        description=(
+            "`expiring`: the credential lapses within 10 days and could not be renewed "
+            "automatically yet. `reauthorization_required`: the platform rejected it or it "
+            "has lapsed; the operator must supply a new one."
+        )
+    )
+    credential_expires_at: datetime | None = None
 
 
 def _ts(value: float) -> datetime:
@@ -297,6 +306,14 @@ def create_app(services: Services, *, start_worker: bool = True) -> FastAPI:
             return replayed
 
         account, provider = resolve(body.account)
+        if account.id in services.worker.rejected_credentials:
+            # Known to fail; say so now instead of accepting work that cannot succeed.
+            raise ApiProblem(
+                409,
+                "account-unavailable",
+                "The platform rejected this account's credential",
+                "The operator must supply a new credential and restart the service.",
+            )
         uploads: dict[str, UploadedMedia] = {}
         for item in body.media:
             if item.media_id is None:
@@ -597,10 +614,32 @@ def create_app(services: Services, *, start_worker: bool = True) -> FastAPI:
 
     # ------------------------------------------------------------ accounts
 
+    def credential_health(
+        account: AccountConfig,
+    ) -> tuple[Literal["ok", "expiring", "reauthorization_required"], datetime | None]:
+        if account.id in services.worker.rejected_credentials:
+            return "reauthorization_required", None
+        expiries = [
+            state.expires_at
+            for state in services.credentials.states(account).values()
+            if state.expires_at is not None
+        ]
+        if not expiries:
+            return "ok", None
+        left = min(expiries) - services.clock()
+        if left <= 0:
+            return "reauthorization_required", _ts(min(expiries))
+        return ("expiring" if left < EXPIRY_WARNING_SECONDS else "ok"), _ts(min(expiries))
+
     def account_view(account: AccountConfig) -> Account:
         _, provider = resolve(account.id)
+        status, expires_at = credential_health(account)
         return Account(
-            id=account.id, platform=account.platform, capabilities=provider.capabilities(account)
+            id=account.id,
+            platform=account.platform,
+            capabilities=provider.capabilities(account),
+            credential_status=status,
+            credential_expires_at=expires_at,
         )
 
     @app.get(

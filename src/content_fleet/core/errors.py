@@ -52,6 +52,7 @@ class PublishError(Exception):
         message: str,
         *,
         retryable: bool | None = None,
+        final: bool = False,
         retry_after: float | None = None,
         provider_code: str | None = None,
         provider_request_id: str | None = None,
@@ -60,6 +61,10 @@ class PublishError(Exception):
         self.category = category
         self.message = message
         self.retryable = DEFAULT_RETRYABLE[category] if retryable is None else retryable
+        # `retryable` answers "could doing this again succeed?". `final` adds
+        # "but not by repeating this step": the publication fails now and the
+        # consumer is told a new submission may work (an expired container).
+        self.final = final
         self.retry_after = retry_after
         self.provider_code = provider_code
         self.provider_request_id = provider_request_id

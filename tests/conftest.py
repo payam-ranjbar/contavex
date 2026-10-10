@@ -209,7 +209,8 @@ async def harness_factory(tmp_path: Path) -> AsyncIterator[HarnessFactory]:
             services = build_services(
                 resolved,
                 config=config or fleet_config(),
-                registry=registry or ProviderRegistry([provider]),
+                # A custom config gets the real providers unless told otherwise.
+                registry=registry or (ProviderRegistry([provider]) if config is None else None),
                 transport=transport,
                 clock=clock,
             )

@@ -20,6 +20,7 @@ import structlog
 from content_fleet.config import AccountConfig, FleetConfig, Settings
 from content_fleet.core.errors import ErrorCategory, PublishError
 from content_fleet.core.models import ErrorInfo, PublicationStatus
+from content_fleet.credentials import CredentialStore
 from content_fleet.media import MediaStore
 from content_fleet.observability import Metrics, log
 from content_fleet.providers.base import (
@@ -30,7 +31,7 @@ from content_fleet.providers.base import (
     Unknown,
 )
 from content_fleet.providers.registry import ProviderRegistry
-from content_fleet.secrets import Secret, SecretError, SecretResolver, redactor
+from content_fleet.secrets import Secret, SecretError, redactor
 from content_fleet.staging import Stager
 from content_fleet.store.db import Database, PublicationRecord
 
@@ -40,6 +41,7 @@ BACKOFF_CAP_SECONDS = 15 * 60.0
 # mistaken for an interrupted one.
 LEASE_MARGIN_SECONDS = 60.0
 MEDIA_PURGE_INTERVAL_SECONDS = 600.0
+CREDENTIAL_CHECK_INTERVAL_SECONDS = 3600.0
 
 
 def backoff_seconds(attempt: int, retry_after: float | None, rng: random.Random) -> float:
@@ -73,7 +75,7 @@ class Worker:
         config: FleetConfig,
         db: Database,
         registry: ProviderRegistry,
-        secrets: SecretResolver,
+        credentials: CredentialStore,
         http: httpx2.AsyncClient,
         media: MediaStore,
         metrics: Metrics,
@@ -85,7 +87,7 @@ class Worker:
         self._config = config
         self._db = db
         self._registry = registry
-        self._secrets = secrets
+        self._credentials = credentials
         self._http = http
         self._media = media
         self._metrics = metrics
@@ -95,6 +97,10 @@ class Worker:
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
         self._last_purge = 0.0
+        self._last_maintenance: float | None = None
+        # Accounts whose credential the provider rejected. In memory on purpose:
+        # fixing a credential means replacing a secret and restarting.
+        self.rejected_credentials: dict[str, str] = {}
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -123,6 +129,7 @@ class Worker:
             try:
                 worked = await self.run_once()
                 self._purge_media()
+                await self.maintain_credentials()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -142,8 +149,46 @@ class Worker:
         if now - self._last_purge >= MEDIA_PURGE_INTERVAL_SECONDS:
             self._last_purge = now
             removed = self._media.purge_expired()
+            self._db.purge_staged_media(now)
             if removed:
                 log.info("media_purged", count=removed)
+
+    async def maintain_credentials(self, *, force: bool = False) -> None:
+        """Let providers refresh credentials that expire (hourly check)."""
+        now = self._clock()
+        if (
+            not force
+            and self._last_maintenance is not None
+            and now - self._last_maintenance < CREDENTIAL_CHECK_INTERVAL_SECONDS
+        ):
+            return
+        self._last_maintenance = now
+        for account in self._config.accounts.values():
+            provider = self._registry.get(account.platform, account.implementation)
+            if provider is None or not provider.mutable_credentials:
+                continue
+            with structlog.contextvars.bound_contextvars(
+                account=account.id, platform=account.platform
+            ):
+                try:
+                    for role in provider.mutable_credentials:
+                        self._credentials.first_seen(account, role)
+                    refreshed = await provider.refresh_credentials(
+                        self.context_for(account, "credential-maintenance"),
+                        self._credentials.states(account),
+                        now,
+                    )
+                    for item in refreshed:
+                        self._credentials.save(account, item)
+                        log.info("credential_refreshed", role=item.role, expires_at=item.expires_at)
+                except PublishError as exc:
+                    if exc.category is ErrorCategory.AUTHENTICATION:
+                        self.rejected_credentials[account.id] = redactor.scrub(exc.message)
+                    log.warning(
+                        "credential_refresh_failed", category=exc.category, error=exc.message
+                    )
+                except Exception:
+                    log.exception("credential_refresh_crashed")
 
     # ---------------------------------------------------------------- provider access
 
@@ -163,9 +208,7 @@ class Worker:
     def context_for(self, account: AccountConfig, publication_id: str) -> ProviderContext:
         """A provider context for work done outside the step loop (edit, delete)."""
         try:
-            credentials = {
-                role: self._secrets.get(name) for role, name in account.credentials.items()
-            }
+            credentials = self._credentials.resolve(account)
         except SecretError as exc:
             raise PublishError(ErrorCategory.AUTHENTICATION, str(exc)) from None
         return self._context(account, credentials, publication_id)
@@ -186,7 +229,25 @@ class Worker:
             implementation=record.implementation,
         ):
             await self._step(record, interrupted)
+            await self._release_staged(record)
         return True
+
+    async def _release_staged(self, record: PublicationRecord) -> None:
+        """Withdraw publicly staged media once its publication is over."""
+        if self._stager is None:
+            return
+        current = self._db.get_publication(record.id)
+        if current is None or not current.status.terminal:
+            return
+        for item in record.request.media:
+            if item.media_id is None:
+                continue
+            try:
+                await self._stager.unstage(item.media_id)
+            except Exception as exc:
+                # Not worth failing a finished publication over; the staged
+                # copy has its own expiry.
+                log.warning("unstage_failed", media_id=item.media_id, error=type(exc).__name__)
 
     async def _step(self, record: PublicationRecord, interrupted: bool) -> None:
         if self._clock() > record.deadline:
@@ -212,14 +273,10 @@ class Worker:
             return
 
         try:
-            credentials = {
-                role: self._secrets.get(name) for role, name in account.credentials.items()
-            }
-        except SecretError as exc:
-            self._fail(record, PublishError(ErrorCategory.AUTHENTICATION, str(exc)))
+            ctx = self.context_for(account, record.id)
+        except PublishError as exc:
+            self._fail(record, exc)
             return
-
-        ctx = self._context(account, credentials, record.id)
 
         started = time.perf_counter()
         try:
@@ -282,6 +339,7 @@ class Worker:
                 record.id, now=now, status=PublicationStatus.PUBLISHED, result=outcome.result
             )
             self._finished(record, PublicationStatus.PUBLISHED, "")
+            self.rejected_credentials.pop(record.account, None)
             log.info("published", posts=[post.id for post in outcome.result.posts])
         elif isinstance(outcome, Continue):
             # Progress resets the attempt counter: it counts consecutive
@@ -311,7 +369,7 @@ class Worker:
 
     def _handle_error(self, record: PublicationRecord, exc: PublishError) -> None:
         attempt = record.attempts + 1
-        if not exc.retryable or attempt >= self._settings.max_attempts:
+        if exc.final or not exc.retryable or attempt >= self._settings.max_attempts:
             self._fail(record, exc)
             return
         now = self._clock()
@@ -339,6 +397,8 @@ class Worker:
         )
 
     def _fail(self, record: PublicationRecord, exc: PublishError) -> None:
+        if exc.category is ErrorCategory.AUTHENTICATION:
+            self.rejected_credentials[record.account] = redactor.scrub(exc.message)
         self._db.finish(
             record.id,
             now=self._clock(),

@@ -354,3 +354,66 @@ class Database:
             ]
             conn.executemany("DELETE FROM media WHERE id = ?", [(id,) for id in ids])
         return ids
+
+    # ---------------------------------------------------------------- credentials
+
+    def get_credential(self, account: str, role: str) -> sqlite3.Row | None:
+        with self._lock:
+            row: sqlite3.Row | None = self._conn.execute(
+                "SELECT * FROM credentials WHERE account = ? AND role = ?", (account, role)
+            ).fetchone()
+        return row
+
+    def put_credential(
+        self,
+        *,
+        account: str,
+        role: str,
+        seed_sha256: str,
+        ciphertext: bytes,
+        obtained_at: float,
+        expires_at: float | None,
+        now: float,
+    ) -> None:
+        with self._tx() as conn:
+            conn.execute(
+                """INSERT INTO credentials
+                   (account, role, seed_sha256, ciphertext, obtained_at, expires_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT (account, role) DO UPDATE SET
+                       seed_sha256 = excluded.seed_sha256, ciphertext = excluded.ciphertext,
+                       obtained_at = excluded.obtained_at, expires_at = excluded.expires_at,
+                       updated_at = excluded.updated_at""",
+                (account, role, seed_sha256, ciphertext, obtained_at, expires_at, now),
+            )
+
+    # ---------------------------------------------------------------- staged media
+
+    def stage_media(self, media_id: str, token: str, expires_at: float) -> str:
+        """Record a public token for a media item; returns the token in force."""
+        with self._tx() as conn:
+            conn.execute(
+                """INSERT INTO staged_media (token, media_id, expires_at) VALUES (?, ?, ?)
+                   ON CONFLICT (media_id) DO UPDATE SET expires_at = excluded.expires_at""",
+                (token, media_id, expires_at),
+            )
+            row = conn.execute(
+                "SELECT token FROM staged_media WHERE media_id = ?", (media_id,)
+            ).fetchone()
+        return str(row[0])
+
+    def staged_media_id(self, token: str, now: float) -> str | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT media_id FROM staged_media WHERE token = ? AND expires_at > ?",
+                (token, now),
+            ).fetchone()
+        return str(row[0]) if row else None
+
+    def unstage_media(self, media_id: str) -> None:
+        with self._tx() as conn:
+            conn.execute("DELETE FROM staged_media WHERE media_id = ?", (media_id,))
+
+    def purge_staged_media(self, now: float) -> None:
+        with self._tx() as conn:
+            conn.execute("DELETE FROM staged_media WHERE expires_at <= ?", (now,))

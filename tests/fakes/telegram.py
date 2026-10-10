@@ -27,6 +27,7 @@ class FakeTelegram:
     queue: list[httpx2.Response | Exception] = field(default_factory=list)
     next_message_id: int = 42
     username: str | None = None
+    posts: int = 0  # sends that Telegram actually accepted
 
     def transport(self) -> httpx2.MockTransport:
         return httpx2.MockTransport(self._handle)
@@ -56,6 +57,8 @@ class FakeTelegram:
             if isinstance(item, Exception):
                 raise item
             return item
+        if call.method.startswith("send"):
+            self.posts += 1
         return httpx2.Response(200, json={"ok": True, "result": self._result(call)})
 
     def _parse(self, method: str, request: httpx2.Request) -> Call:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import urllib.request
+from typing import Any
 
 from content_fleet.config import ConfigError, Settings
 from content_fleet.observability import configure_logging, log
@@ -16,6 +18,7 @@ def serve() -> int:
 
     from content_fleet.api.app import create_app
     from content_fleet.services import build_services
+    from content_fleet.staging.self_hosted import SelfHostedStager
 
     try:
         settings = Settings.from_env()
@@ -25,13 +28,23 @@ def serve() -> int:
         configure_logging()
         log.error("startup_failed", error=str(exc))
         return 78  # EX_CONFIG
-    uvicorn.run(
-        create_app(services),
-        host=settings.host,
-        port=settings.port,
-        log_config=None,
-        access_log=False,
-    )
+    apps: list[tuple[Any, int]] = [(create_app(services), settings.port)]
+    if isinstance(services.stager, SelfHostedStager):
+        # The public media listener: a separate app on a separate port, so the
+        # consumer API can never be exposed by publishing it.
+        apps.append((services.stager.app(), settings.public_port))
+        log.info("public_media_listener", port=settings.public_port)
+    servers = [
+        uvicorn.Server(
+            uvicorn.Config(app, host=settings.host, port=port, log_config=None, access_log=False)
+        )
+        for app, port in apps
+    ]
+
+    async def run() -> None:
+        await asyncio.gather(*(server.serve() for server in servers))
+
+    asyncio.run(run())
     return 0
 
 
