@@ -222,3 +222,13 @@ anonymous client, the unsigned URL was refused (the bucket is private), DELETE r
 the object, and repeating stage and unstage was harmless. This settles the caveat about
 the S3 signature test vectors having been written from memory. Whether Instagram's
 fetcher accepts such a presigned URL is still open until the first publish.
+
+### Settled by live publishing on 2026-10-11 (Instagram)
+
+- Meta's fetcher accepts presigned R2 URLs (about 410 characters, long query string) for images and video (item 11).
+- `media_publish` and container creation accept `Authorization: Bearer` with a JSON body.
+- A Development-mode app with Standard Access can publish to an account added to it; no App Review was needed.
+- Stories do return a permalink (`/stories/<user>/<id>`), contrary to the assumption in the integration notes.
+- After five publishes (image, carousel, reel, two stories) `quota_usage` read 4. Either one kind does not count or the counter lags; not investigated.
+
+Still unverified for Instagram: whether Development-mode posts are visible to the public (check the profile while logged out), the result of a second `media_publish` on a published container, and the real shapes of error responses.

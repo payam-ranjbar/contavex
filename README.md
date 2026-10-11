@@ -10,16 +10,18 @@ vendor API or a vendor credential.
 Everything is built and tested against faked vendor APIs. **Telegram is also
 verified against the real Bot API** (2026-10-10): text, photo, album,
 document, article with slideshow, edit and delete, through the Docker stack, to a real channel.
-**Instagram and LinkedIn have not been run against real accounts yet**: that
-needs credentials. See [Go live](#go-live).
+**Instagram is verified against the real API too** (2026-10-11): image,
+carousel, reel, image story and video story, each uploaded to the service and
+staged on a private Cloudflare R2 bucket. **LinkedIn has not been run against
+a real account yet**: that needs credentials. See [Go live](#go-live).
 
 | Part | State |
 |---|---|
 | Service (API, worker, storage, secrets) | Done, tested |
 | Telegram (Bot API) | Done; tested against a fake and **live against a real channel** |
-| Instagram (Instagram Login) | Done, tested against a fake |
+| Instagram (Instagram Login) | Done; tested against a fake and **live against a real account** |
 | LinkedIn (REST API) | Done, tested against a fake |
-| Media staging for Instagram (S3-compatible, or self-hosted) | Done; S3 signing verified against AWS's published examples |
+| Media staging for Instagram (S3-compatible, or self-hosted) | Object storage verified live on Cloudflare R2, including Instagram fetching the expiring links. Self-hosted: tested against a fake only |
 | Docker image and Compose | Built and smoke-tested: a consumer container publishes through the service container |
 
 ## Contents
@@ -385,7 +387,9 @@ networks:
 ```
 
 - Every secret named in `config/fleet.toml` must also be listed under
-  `secrets:` in `compose.yaml` (commented entries are provided).
+  `secrets:` in `compose.yaml` (commented entries are provided). To keep
+  machine-specific secrets out of the tracked file, put them in a git-ignored
+  `compose.local.yaml` with the same structure and add `-f compose.local.yaml`.
 - The container runs as a non-root user with a read-only filesystem. The
   `fleet-data` volume holds the publication history, uploaded media and
   encrypted tokens: back it up, and back up `secrets/master_key` separately.
