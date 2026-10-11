@@ -192,7 +192,7 @@ vendor behaviour. That is what the live tests are for.
 The complete lists are in each detailed document. These are the ones to
 settle first, by live test, when credentials exist:
 
-1. Telegram: whether `can_post_messages` alone lets the bot *edit* its own channel posts (inferred from wording).
+1. Telegram: whether `can_post_messages` alone lets the bot *edit* its own channel posts (inferred from wording). Still open: the live run on 2026-10-10 used a bot that also had the edit and delete rights, so it does not answer this.
 2. Telegram: the effective channel throttle and how album items count toward it.
 3. Instagram: whether `v26.0` is served on `graph.instagram.com` (reference pages still show v25.0).
 4. Instagram: the real publish quota (50 vs 100) and whether stories count.

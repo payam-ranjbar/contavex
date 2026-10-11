@@ -7,14 +7,16 @@ vendor API or a vendor credential.
 
 ## Status
 
-Everything is built and tested against faked vendor APIs. **Nothing has been
-run against a real Telegram, Instagram or LinkedIn account yet**: that needs
-credentials, and is the only step left. See [Go live](#go-live).
+Everything is built and tested against faked vendor APIs. **Telegram is also
+verified against the real Bot API** (2026-10-10): text, photo, album,
+document, edit and delete, through the Docker stack, to a real channel.
+**Instagram and LinkedIn have not been run against real accounts yet**: that
+needs credentials. See [Go live](#go-live).
 
 | Part | State |
 |---|---|
 | Service (API, worker, storage, secrets) | Done, tested |
-| Telegram (Bot API) | Done, tested against a fake; requests checked against the Bot API 10.3 field list |
+| Telegram (Bot API) | Done; tested against a fake and **live against a real channel** |
 | Instagram (Instagram Login) | Done, tested against a fake |
 | LinkedIn (REST API) | Done, tested against a fake |
 | Media staging for Instagram (S3-compatible, or self-hosted) | Done; S3 signing verified against AWS's published examples |

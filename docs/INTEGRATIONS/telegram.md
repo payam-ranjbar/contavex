@@ -342,4 +342,4 @@ Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/t
 | Safe to retry | 429 (waits `retry_after`), failure to connect, Telegram failing to fetch a media URL |
 | Edit, delete | Run inside the consumer's request; "not modified" and "message to delete not found" count as success |
 | Not implemented | Paid media, rich messages, explicit `entities`, reply markup, thumbnails, replacing media by edit, splitting text over 4096 characters |
-| Checked how | A stateful fake that validates every request against the Bot API 10.3 field list. Not yet run against Telegram itself |
+| Checked how | A stateful fake that validates every request against the Bot API 10.3 field list. Run live on 2026-10-10 against a public test channel, through the Docker stack: `sendMessage` (HTML), `sendPhoto` and `sendDocument` (multipart upload), `sendMediaGroup`, `editMessageText`, `deleteMessages` all returned 200, post links were correct, and neither the bot token nor the consumer key appeared in the container logs. Not exercised live: video, animation, media by URL, rate limiting, a private channel |
