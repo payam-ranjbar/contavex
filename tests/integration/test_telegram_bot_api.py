@@ -603,3 +603,153 @@ class TestRequestsMatchTheBotApi:
     ) -> None:
         with pytest.raises(AssertionError, match=problem):
             check_against_spec(method, params, files)
+
+
+class TestArticles:
+    """Kind "article": a Telegram rich message, with its media as a slideshow."""
+
+    async def test_article_with_a_slideshow_of_uploaded_and_linked_images(
+        self, h: Harness, telegram: FakeTelegram
+    ) -> None:
+        first = await upload(h)
+        publication = await publish(
+            h,
+            kind="article",
+            title="Q3 <results>",
+            text="Up 12% & rising.\nSecond line.\n\nNew paragraph.",
+            media=[
+                {"type": "image", "media_id": first},
+                {"type": "image", "url": "https://cdn.example.com/b.jpg"},
+                {"type": "video", "url": "https://cdn.example.com/c.mp4"},
+            ],
+            options={"telegram": {"media_caption": "Charts"}},
+        )
+
+        assert publication["status"] == "published"
+        assert len(publication["result"]["posts"]) == 1  # one message, unlike an album
+        (call,) = telegram.calls
+        assert call.method == "sendRichMessage"
+        message = json.loads(call.params["rich_message"])
+        assert message == {
+            "html": (
+                "<h1>Q3 &lt;results&gt;</h1>"
+                '<tg-slideshow><img src="tg://photo?id=m0"/><img src="tg://photo?id=m1"/>'
+                '<video src="tg://video?id=m2"></video>'
+                "<figcaption>Charts</figcaption></tg-slideshow>"
+                "<p>Up 12% &amp; rising.<br>Second line.</p><p>New paragraph.</p>"
+            ),
+            "media": [
+                {"id": "m0", "media": {"type": "photo", "media": "attach://m0"}},
+                {"id": "m1", "media": {"type": "photo", "media": "https://cdn.example.com/b.jpg"}},
+                {"id": "m2", "media": {"type": "video", "media": "https://cdn.example.com/c.mp4"}},
+            ],
+        }
+        assert list(call.files) == ["m0"]
+
+    async def test_html_body_collage_and_media_below_the_text(
+        self, h: Harness, telegram: FakeTelegram
+    ) -> None:
+        await publish(
+            h,
+            kind="article",
+            text="<h2>Section</h2><p>Body with <b>bold</b>.</p>",
+            text_format="html",
+            media=[{"type": "image", "url": f"https://x/{i}.jpg"} for i in range(2)],
+            options={
+                "telegram": {
+                    "media_layout": "collage",
+                    "media_position": "bottom",
+                    "right_to_left": True,
+                }
+            },
+        )
+        message = json.loads(json.dumps(telegram.calls[0].params["rich_message"]))
+        assert message["html"] == (
+            "<h2>Section</h2><p>Body with <b>bold</b>.</p>"
+            '<tg-collage><img src="tg://photo?id=m0"/><img src="tg://photo?id=m1"/></tg-collage>'
+        )
+        assert message["is_rtl"] is True
+
+    async def test_stack_layout_puts_each_image_with_its_own_caption(
+        self, h: Harness, telegram: FakeTelegram
+    ) -> None:
+        await publish(
+            h,
+            kind="article",
+            text="x",
+            media=[
+                {"type": "image", "url": "https://x/a.jpg", "alt_text": "First <one>"},
+                {"type": "image", "url": "https://x/b.jpg"},
+            ],
+            options={"telegram": {"media_layout": "stack"}},
+        )
+        assert (
+            telegram.calls[0]
+            .params["rich_message"]["html"]
+            .startswith(
+                '<figure><img src="tg://photo?id=m0"/><figcaption>First &lt;one&gt;</figcaption>'
+                '</figure><img src="tg://photo?id=m1"/>'
+            )
+        )
+
+    async def test_article_without_media_can_be_longer_than_a_post(
+        self, h: Harness, telegram: FakeTelegram
+    ) -> None:
+        publication = await publish(h, kind="article", title="Long read", text="x" * 20_000)
+        assert publication["status"] == "published"
+        assert "media" not in telegram.calls[0].params["rich_message"]
+
+    @pytest.mark.parametrize(
+        ("body", "detail"),
+        [
+            ({"kind": "article", "text": "x" * 32_769}, "limit is 32768"),
+            ({"kind": "post", "title": "T", "text": "x"}, "does not take a title"),
+            (
+                {"kind": "article", "media": [{"type": "document", "url": "https://x/a.pdf"}]},
+                "document is not supported",
+            ),
+            (
+                {
+                    "kind": "article",
+                    "text_format": "html",
+                    "text": '<img src="tg://photo?id=m0"/>',
+                },
+                "must not contain tg:// links",
+            ),
+        ],
+    )
+    async def test_refused_before_telegram_is_called(
+        self, h: Harness, telegram: FakeTelegram, body: dict[str, Any], detail: str
+    ) -> None:
+        response = await h.client.post(
+            "/v1/publications",
+            json={"account": "main", **body},
+            headers={**h.auth(), "idempotency-key": "k"},
+        )
+        assert response.status_code == 422, response.text
+        assert detail in response.json()["detail"]
+        assert telegram.calls == []
+
+    async def test_article_can_be_deleted_but_not_edited(
+        self, h: Harness, telegram: FakeTelegram
+    ) -> None:
+        publication = await publish(h, kind="article", title="T", text="x")
+        url = f"/v1/publications/{publication['id']}"
+        edit = await h.client.patch(url, json={"text": "y"}, headers=h.auth())
+        assert edit.status_code == 422
+        assert "cannot be edited" in edit.json()["detail"]
+        deleted = await h.client.delete(url, headers=h.auth())
+        assert deleted.json()["status"] == "deleted"
+
+    async def test_capabilities_describe_the_article_kind(self, h: Harness) -> None:
+        caps = (await h.client.get("/v1/accounts/main", headers=h.auth())).json()["capabilities"]
+        assert caps["kinds"]["article"] == {
+            "min_media": 0,
+            "max_media": 50,
+            "media_types": ["image", "video"],
+            "text_required": False,
+            "title": True,
+            "max_text_length": 32768,
+        }
+        assert caps["kinds"]["post"]["title"] is False
+        assert "media_layout" in caps["options_schema"]["properties"]

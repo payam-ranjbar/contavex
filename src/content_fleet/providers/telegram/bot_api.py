@@ -14,11 +14,13 @@ Facts this module relies on are in docs/INTEGRATIONS/telegram.md (Bot API
 from __future__ import annotations
 
 import json
+import re
 import time
 from contextlib import ExitStack
+from html import escape
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from content_fleet.config import AccountConfig
 from content_fleet.core.capabilities import Capabilities, KindCapability, MediaTypeCapability
@@ -37,6 +39,8 @@ from content_fleet.providers.base import Done, Provider, ProviderContext, StepOu
 from content_fleet.providers.http import Ambiguous, open_outcome
 
 MB = 1024 * 1024
+ARTICLE_MAX_MEDIA = 50
+ARTICLE_MAX_CHARS = 32768  # Telegram's limit for a rich message
 DEFAULT_API_BASE = "https://api.telegram.org"
 
 # media type -> (send method, name of the file parameter, InputMedia type)
@@ -65,6 +69,11 @@ class TelegramOptions(BaseModel):
     disable_link_preview: bool = False
     show_caption_above_media: bool = False
     parse_mode: Literal["HTML", "MarkdownV2"] | None = None
+    # Articles only: how the media is presented, and where.
+    media_layout: Literal["slideshow", "collage", "stack"] = "slideshow"
+    media_position: Literal["top", "bottom"] = "top"
+    media_caption: str | None = Field(default=None, max_length=1024)
+    right_to_left: bool = False
 
 
 class TelegramBotApi(Provider):
@@ -85,7 +94,15 @@ class TelegramBotApi(Provider):
                         MediaType.DOCUMENT,
                         MediaType.ANIMATION,
                     ],
-                )
+                ),
+                # A "rich message": a formatted article with headings and a
+                # slideshow or collage of its media, sent as one message.
+                "article": KindCapability(
+                    max_media=ARTICLE_MAX_MEDIA,
+                    media_types=[MediaType.IMAGE, MediaType.VIDEO],
+                    title=True,
+                    max_text_length=ARTICLE_MAX_CHARS,
+                ),
             },
             text_formats=["plain", "html"],
             max_text_length=4096,
@@ -119,6 +136,13 @@ class TelegramBotApi(Provider):
     def validate(self, account: AccountConfig, request: PublicationRequest) -> None:
         self._options(request)
         types = {item.type for item in request.media}
+        if request.kind == "article":
+            if request.text_format == "html" and "tg://" in (request.text or ""):
+                raise PublishError(
+                    ErrorCategory.INVALID_REQUEST,
+                    "article HTML must not contain tg:// links; attach media through `media`",
+                )
+            return
         if len(request.media) > 1:
             if MediaType.ANIMATION in types:
                 raise PublishError(
@@ -165,7 +189,10 @@ class TelegramBotApi(Provider):
 
         with ExitStack() as files:
             uploads: dict[str, Any] = {}
-            if not request.media:
+            if request.kind == "article":
+                method = "sendRichMessage"
+                params["rich_message"] = self._article(ctx, request, options, uploads, files)
+            elif not request.media:
                 method = "sendMessage"
                 params |= text
                 if options.disable_link_preview:
@@ -206,6 +233,74 @@ class TelegramBotApi(Provider):
             return Unknown("Telegram accepted the post but its reply could not be read")
         return Done(PublicationResult(posts=[post for post in posts if post is not None]))
 
+    def _article(
+        self,
+        ctx: ProviderContext,
+        request: PublicationRequest,
+        options: TelegramOptions,
+        uploads: dict[str, Any],
+        files: ExitStack,
+    ) -> dict[str, Any]:
+        """An `InputRichMessage`: the article as rich HTML plus its media.
+
+        Media is referenced from the HTML by id (`tg://photo?id=m0`) and
+        supplied alongside, so uploaded files and URLs work the same way.
+        """
+        media: list[dict[str, Any]] = []
+        tags: list[str] = []
+        for index, item in enumerate(request.media):
+            name = f"m{index}"
+            kind = "video" if item.type is MediaType.VIDEO else "photo"
+            media.append(
+                {
+                    "id": name,
+                    "media": {
+                        "type": kind,
+                        "media": self._source(ctx, item, name, uploads, files),
+                    },
+                }
+            )
+            tag = (
+                f'<video src="tg://video?id={name}"></video>'
+                if kind == "video"
+                else f'<img src="tg://photo?id={name}"/>'
+            )
+            if options.media_layout == "stack" and item.alt_text:
+                tag = f"<figure>{tag}<figcaption>{escape(item.alt_text)}</figcaption></figure>"
+            tags.append(tag)
+
+        gallery = ""
+        if tags:
+            caption = (
+                f"<figcaption>{escape(options.media_caption)}</figcaption>"
+                if options.media_caption
+                else ""
+            )
+            if options.media_layout == "stack" or len(tags) == 1:
+                gallery = "".join(tags)
+            else:
+                wrapper = f"tg-{options.media_layout}"
+                gallery = f"<{wrapper}>{''.join(tags)}{caption}</{wrapper}>"
+
+        text = request.text or ""
+        if request.text_format == "html":
+            body = text  # the consumer writes Telegram's rich HTML directly
+        else:
+            body = "".join(
+                f"<p>{escape(block.strip()).replace(chr(10), '<br>')}</p>"
+                for block in re.split(r"\n\s*\n", text)
+                if block.strip()
+            )
+        title = f"<h1>{escape(request.title)}</h1>" if request.title else ""
+        top = options.media_position == "top"
+        parts = [title, gallery, body] if top else [title, body, gallery]
+        message: dict[str, Any] = {"html": "".join(parts)}
+        if media:
+            message["media"] = media
+        if options.right_to_left:
+            message["is_rtl"] = True
+        return message
+
     def _source(
         self,
         ctx: ProviderContext,
@@ -241,6 +336,10 @@ class TelegramBotApi(Provider):
     ) -> None:
         if not result.posts:
             raise PublishError(ErrorCategory.UNSUPPORTED, "Telegram returned no handle to edit")
+        if request.kind == "article":
+            raise PublishError(
+                ErrorCategory.UNSUPPORTED, "an article cannot be edited through this API yet"
+            )
         chat_id, message_id = _handle(result.posts[0])
         parse_mode = "HTML" if changes.get("text_format", request.text_format) == "html" else None
         params: dict[str, Any] = {"chat_id": chat_id, "message_id": message_id}

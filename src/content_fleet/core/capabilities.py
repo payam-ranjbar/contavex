@@ -29,6 +29,10 @@ class KindCapability(BaseModel):
     max_media: int = 0
     media_types: list[MediaType] = []
     text_required: bool = False
+    title: bool = Field(default=False, description="Whether this kind takes a `title`.")
+    max_text_length: int | None = Field(
+        default=None, description="Text limit for this kind, when it differs from the account's."
+    )
 
 
 class Capabilities(BaseModel):
@@ -90,11 +94,13 @@ def check_request(
     text = request.text or ""
     if kind.text_required and not text.strip():
         raise _unsupported(f"kind {request.kind!r} requires text", "text_required")
-    limit = caps.max_caption_length if count else caps.max_text_length
+    if request.title is not None and not kind.title:
+        raise _unsupported(f"kind {request.kind!r} does not take a title", "title")
+    limit = kind.max_text_length or (caps.max_caption_length if count else caps.max_text_length)
     if limit is not None and len(text) > limit:
         raise _unsupported(
             f"text is {len(text)} characters; the limit is {limit}"
-            + (" when media is attached" if count else ""),
+            + (" when media is attached" if count and not kind.max_text_length else ""),
             "text_length",
         )
 

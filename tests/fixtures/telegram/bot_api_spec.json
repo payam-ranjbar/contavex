@@ -1401,6 +1401,21 @@
    "parse_mode": false,
    "type": true
   },
+  "InputRichMessage": {
+   "blocks": false,
+   "html": false,
+   "is_rtl": false,
+   "markdown": false,
+   "media": false,
+   "skip_entity_detection": false
+  },
+  "InputRichMessageContent": {
+   "rich_message": true
+  },
+  "InputRichMessageMedia": {
+   "id": true,
+   "media": true
+  },
   "LinkPreviewOptions": {
    "is_disabled": false,
    "prefer_large_media": false,

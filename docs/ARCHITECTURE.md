@@ -469,9 +469,26 @@ LinkedIn was the test of whether the design had been fitted to its first two use
   ETags checkpointed, and a step yields after 45 seconds, so a 500 MB file neither
   exceeds the step limit nor restarts from zero after a crash.
 
+### 2026-10-10 — Telegram articles
+
+Telegram's "rich message" (a formatted article with a slideshow of its media) was
+added as kind `article` on the existing Telegram implementation. What it needed says
+something about the contract:
+
+- **A new kind, not a new platform or endpoint.** The `kind` vocabulary plus per-account
+  capabilities absorbed it. Other accounts simply do not list `article`.
+- **One new portable field, `title`.** The brief listed "optional title/caption" from the
+  start; no kind had needed a title until now. Kinds declare whether they take one, and a
+  title on a kind without one is refused rather than dropped.
+- **Per-kind text limits.** An article allows 32,768 characters where a post allows 4,096,
+  so the limit moved from "per account" to "per account, overridable per kind".
+- **Layout choices stayed in `options.telegram`.** Slideshow versus collage is Telegram's
+  concept; it was not promoted to the common model on the strength of one platform.
+
 ### Limits of what has been shown
 
 Every provider is verified against a fake that encodes our reading of the vendor's
-documentation. No request has yet reached a real vendor API with a valid credential. The
+documentation. Telegram has also been run against the real Bot API (2026-10-10).
+Instagram and LinkedIn have not: no request has reached them with a valid credential. The
 live tests exist for that; until they have run, treat vendor-facing behaviour as
 implemented to the documentation, not as confirmed.

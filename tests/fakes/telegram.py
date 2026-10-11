@@ -37,6 +37,19 @@ def check_against_spec(method: str, params: dict[str, Any], files: set[str]) -> 
         options = params["link_preview_options"]
         options = json.loads(options) if isinstance(options, str) else options
         assert set(options) <= set(SPEC["types"]["LinkPreviewOptions"])
+    if method == "sendRichMessage":
+        message = params["rich_message"]
+        message = json.loads(message) if isinstance(message, str) else message
+        assert set(message) <= set(SPEC["types"]["InputRichMessage"])
+        assert sum(key in message for key in ("html", "markdown", "blocks")) == 1
+        for entry in message.get("media", []):
+            assert set(entry) == set(SPEC["types"]["InputRichMessageMedia"])
+            kind = SPEC["types"][_INPUT_MEDIA[entry["media"]["type"]]]
+            assert set(entry["media"]) <= set(kind)
+            # Every declared media must be used in the text, and vice versa.
+            assert f'?id={entry["id"]}"' in message["html"], f"media {entry['id']} is unused"
+            attached.add(str(entry["media"]["media"]).removeprefix("attach://"))
+        assert message["html"].count("tg://") == len(message.get("media", []))
     if method == "sendMediaGroup":
         media = params["media"]
         for item in json.loads(media) if isinstance(media, str) else media:

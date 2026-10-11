@@ -334,12 +334,13 @@ Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/t
 
 | Topic | What the implementation does |
 | --- | --- |
-| Methods used | `sendMessage`, `sendPhoto`, `sendVideo`, `sendDocument`, `sendAnimation`, `sendMediaGroup`, `editMessageText`, `editMessageCaption`, `deleteMessages` |
+| Methods used | `sendMessage`, `sendPhoto`, `sendVideo`, `sendDocument`, `sendAnimation`, `sendMediaGroup`, `sendRichMessage`, `editMessageText`, `editMessageCaption`, `deleteMessages` |
 | Account settings | `chat_id` (required), `test_environment` (Telegram's test servers), `api_base` (a self-hosted Bot API server) |
 | Uploaded media | Sent as multipart from the service's media store. Media given by URL is passed to Telegram to fetch, except documents |
 | Albums | 2 to 10 items; the caption goes on the first item; one post id per message |
 | Ambiguous send (timeout, connection reset, 5xx, unreadable reply) | Never retried. The publication becomes `outcome_unknown` |
 | Safe to retry | 429 (waits `retry_after`), failure to connect, Telegram failing to fetch a media URL |
 | Edit, delete | Run inside the consumer's request; "not modified" and "message to delete not found" count as success |
-| Not implemented | Paid media, rich messages, explicit `entities`, reply markup, thumbnails, replacing media by edit, splitting text over 4096 characters |
+| Articles (added 2026-10-10) | Kind `article` sends a rich message (`sendRichMessage`, Bot API 10.1+): `title` becomes `<h1>`, the media becomes a `<tg-slideshow>`, `<tg-collage>` or a stack of figures, and the body is escaped plain text or the consumer's rich HTML. Media is declared in `rich_message.media` and referenced as `tg://photo?id=` / `tg://video?id=`, so uploads (`attach://`) and URLs work alike. Limits per Telegram: 32,768 characters, 50 media, 500 blocks. Verified live: slideshow of three uploaded images with a caption, collage with an HTML body, text-only article; all returned 200. How they render was not checked by the service's author: the public web preview does not display rich messages |
+| Not implemented | Paid media, editing an article (possible through `editMessageText` with `rich_message`), rich-message blocks as JSON, Markdown articles, explicit `entities`, reply markup, thumbnails, replacing media by edit, splitting text over 4096 characters |
 | Checked how | A stateful fake that validates every request against the Bot API 10.3 field list. Run live on 2026-10-10 against a public test channel, through the Docker stack: `sendMessage` (HTML), `sendPhoto` and `sendDocument` (multipart upload), `sendMediaGroup`, `editMessageText`, `deleteMessages` all returned 200, post links were correct, and neither the bot token nor the consumer key appeared in the container logs. Not exercised live: video, animation, media by URL, rate limiting, a private channel |

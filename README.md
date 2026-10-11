@@ -9,7 +9,7 @@ vendor API or a vendor credential.
 
 Everything is built and tested against faked vendor APIs. **Telegram is also
 verified against the real Bot API** (2026-10-10): text, photo, album,
-document, edit and delete, through the Docker stack, to a real channel.
+document, article with slideshow, edit and delete, through the Docker stack, to a real channel.
 **Instagram and LinkedIn have not been run against real accounts yet**: that
 needs credentials. See [Go live](#go-live).
 
@@ -282,8 +282,9 @@ A publication request:
 }
 ```
 
-- `kind` is what to publish: `post` everywhere, plus `reel` and `story` on
-  Instagram. Each account lists the kinds it accepts.
+- `kind` is what to publish: `post` everywhere, plus `article` on Telegram
+  and `reel` and `story` on Instagram. Each account lists the kinds it accepts.
+- `title` is a headline, for kinds that have one (`article`).
 - `media[]` items carry either a `media_id` from an upload, or a public
   `https://` `url` on accounts that accept URLs.
 - `options` holds platform-specific settings, keyed by platform. Only the
@@ -291,6 +292,38 @@ A publication request:
   accounts.
 - A request the account cannot honour is refused immediately with `422` and
   the reason. Nothing is silently dropped or downgraded.
+
+### Telegram articles with a slideshow
+
+`kind: "article"` sends a Telegram "rich message": one formatted message with
+a headline, body text of up to 32,768 characters, and up to 50 images or
+videos shown as a swipeable slideshow.
+
+```json
+{
+  "account": "news-channel",
+  "kind": "article",
+  "title": "Launch day",
+  "text": "First paragraph.\n\nSecond paragraph.",
+  "media": [
+    { "type": "image", "media_id": "med_1" },
+    { "type": "image", "media_id": "med_2" },
+    { "type": "image", "media_id": "med_3" }
+  ],
+  "options": { "telegram": { "media_layout": "slideshow", "media_caption": "Photos from the event" } }
+}
+```
+
+- `media_layout`: `slideshow` (default), `collage`, or `stack` (each image
+  on its own, with its `alt_text` as caption).
+- `media_position`: `top` (default) or `bottom`. `right_to_left: true` for
+  Persian or Arabic text.
+- With `text_format: "plain"` the text is escaped and blank lines separate
+  paragraphs. With `text_format: "html"` the body is Telegram's rich HTML:
+  headings, lists, tables, block quotes, links.
+- An article can be deleted through the API but not edited yet.
+- Rich messages need a recent Telegram app; the public web preview
+  (`t.me/s/<channel>`) shows "open Telegram to view this post" instead.
 
 **Always send an `Idempotency-Key`**, unique per logical post, and reuse it
 when retrying. The same key with the same body returns the original
@@ -322,6 +355,7 @@ service: `uv run python -m content_fleet openapi`.
 | Video | Yes | As `reel` | Yes (MP4) |
 | Document | Yes | No | Yes (PDF, Word, PowerPoint) |
 | Several media in one post | Album, 2–10 | Carousel, 2–10 | 2–20 images |
+| Article with slideshow | Yes (`article`, up to 50 media) | No | No |
 | Story | No | Yes | No |
 | Text formats | `plain`, `html` | `plain` | `plain`, `little` (LinkedIn markup) |
 | Media by upload | Yes | With `[staging]` | Yes |

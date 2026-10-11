@@ -66,6 +66,11 @@ class PublicationRequest(BaseModel):
             "platform's entry is used; it is validated strictly."
         ),
     )
+    title: str | None = Field(
+        default=None,
+        max_length=300,
+        description="Headline, for kinds that have one (an article). See capabilities.",
+    )
     client_reference: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
