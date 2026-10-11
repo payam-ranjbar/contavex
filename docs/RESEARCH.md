@@ -213,3 +213,12 @@ settle first, by live test, when credentials exist:
 - `/me` returns the flat object wrapped in a `data` array, as Meta's sample shows.
 
 Still open: everything about publishing itself (container processing, `media_publish`, the fetcher).
+
+### Settled by live calls on 2026-10-11 (object storage)
+
+The object-storage stager was run against a real Cloudflare R2 bucket with the service's
+own SigV4 code: PUT accepted, the presigned GET URL returned the same bytes to an
+anonymous client, the unsigned URL was refused (the bucket is private), DELETE removed
+the object, and repeating stage and unstage was harmless. This settles the caveat about
+the S3 signature test vectors having been written from memory. Whether Instagram's
+fetcher accepts such a presigned URL is still open until the first publish.
