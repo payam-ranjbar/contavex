@@ -204,3 +204,12 @@ settle first, by live test, when credentials exist:
 10. Docker: SQLite WAL behaviour on a Docker Desktop named volume (expected fine; bind mounts from Windows are avoided).
 11. Instagram: whether Meta's media fetcher accepts presigned URLs (long query strings). If the first live publish from object storage fails to fetch, set `public_base_url` in `[staging]`.
 12. Instagram: whether `Authorization: Bearer` is accepted on every `graph.instagram.com` call used (the implementation never puts the token in a URL except for the documented refresh call).
+
+### Settled by live calls on 2026-10-11 (Instagram, read-only)
+
+- `graph.instagram.com` serves both `v25.0` and `v26.0` (items 3).
+- `Authorization: Bearer` is accepted on `/me`, `/{id}/media` and `/{id}/content_publishing_limit` (item 12).
+- The publishing quota reported for a new creator account is `quota_total: 100` per 24 hours (item 4, for this account).
+- `/me` returns the flat object wrapped in a `data` array, as Meta's sample shows.
+
+Still open: everything about publishing itself (container processing, `media_publish`, the fetcher).

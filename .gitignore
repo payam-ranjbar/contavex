@@ -46,3 +46,4 @@ Thumbs.db
 
 # Operator-specific; config/fleet.example.toml is the tracked template.
 /config/fleet.toml
+/compose.local.yaml
