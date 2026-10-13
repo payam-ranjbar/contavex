@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from content_fleet.providers.base import Provider
+from content_fleet.providers.instagram.facebook_login import InstagramFacebookLogin
 from content_fleet.providers.instagram.instagram_login import InstagramLogin
 from content_fleet.providers.linkedin.rest import LinkedInRest
 from content_fleet.providers.telegram.bot_api import TelegramBotApi
@@ -41,6 +42,7 @@ def default_registry(*, staging_available: bool = False) -> ProviderRegistry:
         [
             TelegramBotApi(),
             InstagramLogin(staging_available=staging_available),
+            InstagramFacebookLogin(staging_available=staging_available),
             LinkedInRest(),
         ]
     )

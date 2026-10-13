@@ -485,6 +485,22 @@ something about the contract:
 - **Layout choices stayed in `options.telegram`.** Slideshow versus collage is Telegram's
   concept; it was not promoted to the common model on the strength of one platform.
 
+### 2026-10-12 — a second implementation of one platform, for real
+
+Requirement F-10 (one platform, several implementations) had only been exercised by
+design. Deleting Instagram posts made it concrete: Meta offers deletion on its Facebook
+Login API and not on the Instagram Login API, which a live call confirmed.
+
+- `instagram / facebook-login` is a subclass of the first implementation that changes
+  three things: the host, "nothing to refresh", and `delete`. It is 60 lines.
+- It is one more line in the registry and one more driver in the contract suite, which
+  it passes unchanged. That suite now runs one platform through two implementations.
+- Nothing in the consumer contract moved. An operator switches an account by changing
+  `implementation` and its credential; the account's capabilities then report
+  `deletable: true`.
+- The cost that could not be designed away is the operator's: a Facebook Page and a
+  separate Meta app.
+
 ### Limits of what has been shown
 
 Every provider is verified against a fake that encodes our reading of the vendor's

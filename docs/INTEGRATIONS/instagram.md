@@ -505,7 +505,8 @@ Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/i
 
 | Topic | What the implementation does |
 | --- | --- |
-| Variant | Instagram API with Instagram Login only. The Facebook Login variant (delete, binary video upload) is not implemented; it would be a second implementation of the same platform |
+| Variant | Two implementations of the platform. `instagram-login` (Instagram API with Instagram Login): verified live. `facebook-login` (Instagram API with Facebook Login, added 2026-10-12): the same flow on `graph.facebook.com` plus `DELETE /{media-id}`; no token refresh; tested against a fake only. Its binary video upload is not implemented |
+| Delete | Not possible with `instagram-login`: a live `DELETE` on `graph.instagram.com` (v25.0 and v26.0) returned code 100, subcode 33, "Unsupported delete request". Meta's media reference lists delete under Facebook Login only, with `instagram_manage_contents`. With `facebook-login` the service deletes images, reels, stories and whole carousels |
 | Account settings | `ig_user_id` (required), `api_version` (default `v25.0`, the version the Instagram reference pages document), `api_base` |
 | Kinds | `post` (one image, or a carousel of 2 to 10 images and videos), `reel` (one video), `story` (one image or video, no caption) |
 | Steps | stage uploads → create container(s) → poll until `FINISHED` → check the publishing quota → `media_publish` → read the permalink |

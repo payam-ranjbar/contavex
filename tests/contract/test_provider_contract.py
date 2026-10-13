@@ -143,6 +143,18 @@ class InstagramLoginDriver(Driver):
         self.fake.plan("create_container", ig.graph_error(100, "Invalid parameter"))
 
 
+class InstagramFacebookLoginDriver(InstagramLoginDriver):
+    """The same platform through its other implementation: the whole suite
+    must hold for it too, with `deletable` now true."""
+
+    implementation = "facebook-login"
+    secrets = {"vendor_credential": ig.TOKEN}  # noqa: RUF012
+    extra_config: dict[str, Any] = {}  # noqa: RUF012
+
+    def __init__(self) -> None:
+        self.fake = ig.FakeInstagram(host="graph.facebook.com")
+
+
 class LinkedInRestDriver(Driver):
     platform = "linkedin"
     implementation = "rest"
@@ -185,7 +197,12 @@ class LinkedInRestDriver(Driver):
         self.fake.plan("create_post", li.li_error(400, "Invalid value", "INVALID_VALUE_FOR_FIELD"))
 
 
-DRIVERS: list[type[Driver]] = [TelegramBotApiDriver, InstagramLoginDriver, LinkedInRestDriver]
+DRIVERS: list[type[Driver]] = [
+    TelegramBotApiDriver,
+    InstagramLoginDriver,
+    InstagramFacebookLoginDriver,
+    LinkedInRestDriver,
+]
 
 
 @pytest.fixture(params=DRIVERS, ids=lambda d: f"{d.platform}/{d.implementation}")

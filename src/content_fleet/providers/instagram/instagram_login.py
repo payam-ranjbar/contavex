@@ -96,6 +96,7 @@ def _poll_delay(polls: int) -> float:
 class InstagramLogin(Provider):
     platform = "instagram"
     implementation = "instagram-login"
+    api_base = DEFAULT_API_BASE  # the Facebook Login variant overrides this
     mutable_credentials = frozenset({"access_token"})
 
     def __init__(self, *, staging_available: bool = False) -> None:
@@ -131,7 +132,7 @@ class InstagramLogin(Provider):
                 ),
             },
             editable=[],  # the API cannot edit a published post
-            deletable=False,  # only the Facebook Login variant can delete
+            deletable=False,  # only the Facebook Login variant can delete (verified live)
             options_schema=InstagramOptions.model_json_schema(),
         )
 
@@ -463,7 +464,7 @@ class InstagramLogin(Provider):
             return []
         if state.expires_at is not None and state.expires_at - now > REFRESH_WHEN_LEFT:
             return []
-        base = str(ctx.account.settings.get("api_base", DEFAULT_API_BASE)).rstrip("/")
+        base = str(ctx.account.settings.get("api_base", self.api_base)).rstrip("/")
         body = await self._request(
             ctx,
             "GET",
@@ -504,7 +505,7 @@ class InstagramLogin(Provider):
         if path.startswith("https://"):
             url = path
         else:
-            base = str(ctx.account.settings.get("api_base", DEFAULT_API_BASE)).rstrip("/")
+            base = str(ctx.account.settings.get("api_base", self.api_base)).rstrip("/")
             version = ctx.account.settings.get("api_version", DEFAULT_API_VERSION)
             url = f"{base}/{version}{path}"
         headers = {}
@@ -663,7 +664,7 @@ def _classify(error: dict[str, Any], headers: httpx2.Headers) -> PublishError:
         return fail(ErrorCategory.MEDIA_REJECTED)
     if code in (100, 36004) or subcode == 2207057:
         return fail(ErrorCategory.INVALID_REQUEST)
-    if code in (25, 368, 506):
+    if code in (25, 368, 506) or subcode == 2207073:  # 2207073: media type cannot be deleted
         return fail(ErrorCategory.PROVIDER_REJECTED)
     if code in _TRANSIENT or code == 24 or error.get("is_transient") is True:
         return fail(ErrorCategory.PROVIDER_UNAVAILABLE)

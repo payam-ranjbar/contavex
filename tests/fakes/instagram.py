@@ -62,8 +62,10 @@ class FakeInstagram:
     calls: list[Call] = field(default_factory=list)
     containers: dict[str, Container] = field(default_factory=dict)
     media: list[dict[str, Any]] = field(default_factory=list)
+    stories: list[dict[str, Any]] = field(default_factory=list)
     valid_token: str = TOKEN
     video_polls: int = 2  # how many status polls a video stays IN_PROGRESS
+    host: str = "graph.instagram.com"  # "graph.facebook.com" for the Facebook Login variant
     quota_usage: int = 0
     quota_total: int = 50
     _planned: dict[str, list[_Planned]] = field(default_factory=dict)
@@ -98,7 +100,7 @@ class FakeInstagram:
         return f"{prefix}{self._next_id}"
 
     def _handle(self, request: httpx2.Request) -> httpx2.Response:
-        assert request.url.host == "graph.instagram.com"
+        assert request.url.host == self.host, f"wrong host {request.url.host}"
         operation, target = self._route(request)
         body = json.loads(request.content) if request.content else dict(request.url.params)
         self.calls.append(Call(operation, body))
@@ -134,6 +136,8 @@ class FakeInstagram:
             if edge == "content_publishing_limit":
                 return "publishing_limit", ""
         assert len(parts) == 1, f"unexpected path {path}"
+        if request.method == "DELETE":
+            return "delete_media", parts[0]
         if parts[0] in self.containers:
             return "container_status", parts[0]
         return "get_media", parts[0]
@@ -179,6 +183,21 @@ class FakeInstagram:
                 return graph_error(9, "Application request limit reached", subcode=2207042)
             return httpx2.Response(200, json={"id": self._publish(container_id)})
 
+        if operation == "delete_media":
+            exists = any(media["id"] == target for media in self.media + self.stories)
+            if self.host != "graph.facebook.com" or not exists:
+                # What graph.instagram.com answered to a real delete on 2026-10-11.
+                return graph_error(
+                    100,
+                    f"Unsupported delete request. Object with ID '{target}' does not exist, "
+                    "cannot be loaded due to missing permissions, or does not support this "
+                    "operation",
+                    subcode=33,
+                )
+            self.media = [media for media in self.media if media["id"] != target]
+            self.stories = [media for media in self.stories if media["id"] != target]
+            return httpx2.Response(200, json={"success": True, "deleted_id": target})
+
         if operation == "list_media":
             return httpx2.Response(200, json={"data": list(reversed(self.media))[:10]})
 
@@ -222,6 +241,6 @@ class FakeInstagram:
             "caption": container.body.get("caption"),
             "permalink": f"https://www.instagram.com/p/{media_id}/",
         }
-        if not is_story:  # stories are not returned by the media edge
-            self.media.append(entry)
+        # Stories are not returned by the media edge.
+        (self.stories if is_story else self.media).append(entry)
         return media_id

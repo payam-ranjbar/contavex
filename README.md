@@ -167,6 +167,30 @@ publish to an account you own.
    Without `[staging]`, an Instagram account only accepts media that is
    already at a public `https://` URL.
 
+**Deleting posts needs the other Instagram setup.** Meta's "Instagram Login"
+API, used above, cannot delete a post (tried against the real API: it
+answers "Unsupported delete request"). Deletion exists only on Meta's
+"Facebook Login" API. This service implements both; to be able to delete,
+configure the account with `implementation = "facebook-login"` instead:
+
+- Connect the Instagram professional account to a **Facebook Page**.
+- Create a **separate Meta app** (an app has only one setup) and in the
+  Instagram use case choose **API setup with Facebook Login**. Add the
+  permissions `instagram_basic`, `instagram_content_publish`,
+  `pages_read_engagement`, `pages_show_list`, and **`instagram_manage_contents`**
+  (the one that allows deleting).
+- Generate a token with those permissions, for example in the
+  [Graph API Explorer](https://developers.facebook.com/tools/explorer), and
+  save it as the account's `access_token` secret. A Page access token made
+  from a long-lived user token does not expire; this variant's token is not
+  renewed by the service.
+- `ig_user_id` is the Page's `instagram_business_account` id:
+  `GET /{page-id}?fields=instagram_business_account`.
+
+Consumers notice nothing but the account's capabilities changing to
+`deletable: true`. This variant is tested against a fake only, not yet
+against Meta.
+
 Leave the Meta app in **Development mode**. If the token is ever unused for
 60 days it lapses: repeat step 4, replace the secret file, restart.
 
@@ -363,7 +387,7 @@ service: `uv run python -m content_fleet openapi`.
 | Media by upload | Yes | With `[staging]` | Yes |
 | Media by public URL | Yes (not documents) | Yes | No |
 | Edit text afterwards | Yes | No | Yes |
-| Delete afterwards | Yes (within 48 h) | No | Yes |
+| Delete afterwards | Yes (within 48 h) | Only with the `facebook-login` implementation | Yes |
 | After a lost response | `outcome_unknown` | Found again automatically | Page: found again. Profile: `outcome_unknown` |
 | Credential upkeep | None | Renewed automatically | Manual every 60 days unless LinkedIn issues refresh tokens |
 
