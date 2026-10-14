@@ -1,11 +1,11 @@
 # The Docker smoke test: the real image, hardened exactly like compose.yaml,
 # with a fake Telegram and a consumer as separate containers.
 # FIXTURES and TESTS_DIR are set by tests/docker/test_docker.py.
-name: content-fleet-smoke
+name: contavex-smoke
 
 services:
   publisher:
-    image: content-fleet:test
+    image: contavex:test
     init: true
     user: "10001:10001"
     read_only: true
@@ -17,17 +17,17 @@ services:
       - no-new-privileges:true
     volumes:
       - smoke-data:/data
-      - ${FIXTURES}/fleet.toml:/config/fleet.toml:ro
+      - ${FIXTURES}/contavex.toml:/config/contavex.toml:ro
     secrets:
       - consumer_api_key_demo
       - telegram_news_bot_token
     networks:
-      - fleet
+      - contavex
     depends_on:
       - fake-telegram
 
   fake-telegram:
-    image: content-fleet:test
+    image: contavex:test
     entrypoint: ["python", "/fake/fake_telegram_server.py", "8443"]
     healthcheck:  # replaces the image's own, which probes the publishing service
       test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8443), 2)"]
@@ -36,10 +36,10 @@ services:
     volumes:
       - ${TESTS_DIR}:/fake:ro
     networks:
-      - fleet
+      - contavex
 
   consumer:
-    image: content-fleet:test
+    image: contavex:test
     profiles: ["tools"]
     entrypoint: ["python", "/consumer/consumer.py"]
     healthcheck:
@@ -49,10 +49,10 @@ services:
     secrets:
       - consumer_api_key_demo  # its own key only; no vendor credential
     networks:
-      - fleet
+      - contavex
 
 networks:
-  fleet:
+  contavex:
 
 volumes:
   smoke-data:

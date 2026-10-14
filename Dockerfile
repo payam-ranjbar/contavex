@@ -31,8 +31,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM ${PYTHON_IMAGE}
 # The data directory exists in the image with the right owner so that a new
 # named volume mounted over it inherits that ownership.
-RUN groupadd --gid 10001 fleet \
-    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin fleet \
+RUN groupadd --gid 10001 contavex \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin contavex \
     && install -d -o 10001 -g 10001 /data
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH \
@@ -45,6 +45,6 @@ VOLUME ["/data"]
 EXPOSE 8080 8081
 # Readiness, checked with the service's own interpreter: no curl in the image.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --start-interval=2s --retries=3 \
-    CMD ["python", "-m", "content_fleet", "healthcheck"]
-ENTRYPOINT ["python", "-m", "content_fleet"]
+    CMD ["python", "-m", "contavex", "healthcheck"]
+ENTRYPOINT ["python", "-m", "contavex"]
 CMD ["serve"]

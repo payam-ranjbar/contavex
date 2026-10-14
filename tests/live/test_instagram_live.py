@@ -2,10 +2,10 @@
 this API cannot delete; remove it by hand afterwards. Use a throw-away
 professional account.
 
-    $env:CF_LIVE_TESTS = "1"
-    $env:CF_LIVE_INSTAGRAM_TOKEN_FILE = "secrets\\instagram_brand_access_token"
-    $env:CF_LIVE_INSTAGRAM_USER_ID = "1784..."
-    $env:CF_LIVE_INSTAGRAM_IMAGE_URL = "https://.../public.jpg"   # a public JPEG
+    $env:CONTAVEX_LIVE_TESTS = "1"
+    $env:CONTAVEX_LIVE_INSTAGRAM_TOKEN_FILE = "secrets\\instagram_brand_access_token"
+    $env:CONTAVEX_LIVE_INSTAGRAM_USER_ID = "1784..."
+    $env:CONTAVEX_LIVE_INSTAGRAM_IMAGE_URL = "https://.../public.jpg"   # a public JPEG
     uv run pytest -m live tests/live/test_instagram_live.py -s
 """
 
@@ -18,14 +18,14 @@ from pathlib import Path
 
 import pytest
 
-from content_fleet.config import FleetConfig
+from contavex.config import ContavexConfig
 from tests.conftest import Harness, HarnessFactory
 
 pytestmark = [
     pytest.mark.live,
     pytest.mark.anyio,
     pytest.mark.skipif(
-        os.environ.get("CF_LIVE_TESTS") != "1", reason="live tests need CF_LIVE_TESTS=1"
+        os.environ.get("CONTAVEX_LIVE_TESTS") != "1", reason="live tests need CONTAVEX_LIVE_TESTS=1"
     ),
 ]
 
@@ -36,14 +36,14 @@ def _read(path: str) -> str:
 
 @pytest.fixture
 async def h(harness_factory: HarnessFactory) -> Harness:
-    token_file = os.environ.get("CF_LIVE_INSTAGRAM_TOKEN_FILE")
-    user_id = os.environ.get("CF_LIVE_INSTAGRAM_USER_ID")
-    if not token_file or not user_id or not os.environ.get("CF_LIVE_INSTAGRAM_IMAGE_URL"):
-        pytest.skip("set CF_LIVE_INSTAGRAM_TOKEN_FILE, _USER_ID and _IMAGE_URL")
+    token_file = os.environ.get("CONTAVEX_LIVE_INSTAGRAM_TOKEN_FILE")
+    user_id = os.environ.get("CONTAVEX_LIVE_INSTAGRAM_USER_ID")
+    if not token_file or not user_id or not os.environ.get("CONTAVEX_LIVE_INSTAGRAM_IMAGE_URL"):
+        pytest.skip("set CONTAVEX_LIVE_INSTAGRAM_TOKEN_FILE, _USER_ID and _IMAGE_URL")
     settings = {"ig_user_id": user_id}
-    if version := os.environ.get("CF_LIVE_INSTAGRAM_API_VERSION"):
+    if version := os.environ.get("CONTAVEX_LIVE_INSTAGRAM_API_VERSION"):
         settings["api_version"] = version  # e.g. v26.0, to settle which versions are served
-    config = FleetConfig.parse(
+    config = ContavexConfig.parse(
         {
             "consumers": {"tester": {"api_key": "consumer_key"}},
             "service": {"master_key": "master_key"},
@@ -68,8 +68,8 @@ async def h(harness_factory: HarnessFactory) -> Harness:
 
 async def test_publish_an_image(h: Harness) -> None:
     response = await h.submit(
-        text="content-fleet live test (delete me)",
-        media=[{"type": "image", "url": os.environ["CF_LIVE_INSTAGRAM_IMAGE_URL"]}],
+        text="contavex live test (delete me)",
+        media=[{"type": "image", "url": os.environ["CONTAVEX_LIVE_INSTAGRAM_IMAGE_URL"]}],
         key="live-1",
     )
     assert response.status_code == 202, response.text

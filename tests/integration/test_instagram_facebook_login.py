@@ -11,7 +11,7 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import FleetConfig
+from contavex.config import ContavexConfig
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes.instagram import IG_USER_ID, TOKEN, FakeInstagram, graph_error
 
@@ -21,7 +21,7 @@ IMAGE = {"type": "image", "url": "https://cdn.example.com/a.jpg"}
 VIDEO = {"type": "video", "url": "https://cdn.example.com/a.mp4"}
 
 
-def config(implementation: str = "facebook-login") -> FleetConfig:
+def config(implementation: str = "facebook-login") -> ContavexConfig:
     raw: dict[str, Any] = {
         "consumers": {"tester": {"api_key": "consumer_key"}},
         "accounts": {
@@ -33,7 +33,7 @@ def config(implementation: str = "facebook-login") -> FleetConfig:
             }
         },
     }
-    return FleetConfig.parse(raw)
+    return ContavexConfig.parse(raw)
 
 
 @pytest.fixture
@@ -157,7 +157,7 @@ async def test_the_instagram_login_variant_answers_as_the_real_api_did(
     is refused (observed live), and the service never even sends it."""
     instagram = FakeInstagram()
     h = await harness_factory(
-        config=FleetConfig.parse(
+        config=ContavexConfig.parse(
             {
                 "consumers": {"tester": {"api_key": "consumer_key"}},
                 "service": {"master_key": "master_key"},

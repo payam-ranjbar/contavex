@@ -8,14 +8,14 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import ConfigError, FleetConfig, Settings
-from content_fleet.core.errors import ErrorCategory, PublishError
-from content_fleet.media import MediaStore
-from content_fleet.secrets import Secret
-from content_fleet.services import build_services
-from content_fleet.staging.object_storage import ObjectStorageStager
-from content_fleet.staging.sigv4 import EMPTY_SHA256, encode_key, presign_get, sign
-from content_fleet.store.db import Database
+from contavex.config import ConfigError, ContavexConfig, Settings
+from contavex.core.errors import ErrorCategory, PublishError
+from contavex.media import MediaStore
+from contavex.secrets import Secret
+from contavex.services import build_services
+from contavex.staging.object_storage import ObjectStorageStager
+from contavex.staging.sigv4 import EMPTY_SHA256, encode_key, presign_get, sign
+from contavex.store.db import Database
 from tests.conftest import FakeClock, write_secrets
 
 pytestmark = pytest.mark.unit
@@ -93,7 +93,7 @@ class TestSigV4:
 
 SETTINGS = {
     "endpoint": "https://s3.example.com",
-    "bucket": "fleet-media",
+    "bucket": "contavex-media",
     "region": "auto",
     "public_base_url": "https://cdn.example.com",
 }
@@ -161,7 +161,7 @@ class TestObjectStorageStager:
         ((content, content_type),) = bucket.objects.values()
         assert content == b"\xff\xd8 picture bytes" and content_type == "image/jpeg"
         assert bucket.requests[0].url.host == "s3.example.com"
-        assert bucket.requests[0].url.path.startswith("/fleet-media/staged/")
+        assert bucket.requests[0].url.path.startswith("/contavex-media/staged/")
 
     async def test_private_bucket_hands_out_an_expiring_presigned_url(self, store: Any) -> None:
         media, record, clock = store
@@ -173,7 +173,7 @@ class TestObjectStorageStager:
             )
             url = await stager.stage(record)
 
-        assert url.startswith("https://s3.example.com/fleet-media/staged/")
+        assert url.startswith("https://s3.example.com/contavex-media/staged/")
         assert "X-Amz-Expires=600" in url and "X-Amz-Signature=" in url
         assert url.isascii() and SECRET_KEY not in url
         assert len(bucket.objects) == 1
@@ -230,7 +230,7 @@ class TestObjectStorageStager:
 class TestStagingConfiguration:
     def _build(self, tmp_path: Path, staging: dict[str, Any]) -> None:
         write_secrets(tmp_path / "secrets", consumer_key="k" * 16, s3_id="AKIA", s3_secret="s" * 20)
-        config = FleetConfig.parse(
+        config = ContavexConfig.parse(
             {"consumers": {"a": {"api_key": "consumer_key"}}, "staging": staging}
         )
         settings = Settings(data_dir=tmp_path / "data", secrets_dir=tmp_path / "secrets")

@@ -10,9 +10,9 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import ConfigError, FleetConfig
-from content_fleet.observability import configure_logging
-from content_fleet.providers.linkedin.rest import escape_little
+from contavex.config import ConfigError, ContavexConfig
+from contavex.observability import configure_logging
+from contavex.providers.linkedin.rest import escape_little
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes.linkedin import (
     ACCESS_EXPIRES_IN,
@@ -49,8 +49,8 @@ FULL_CREDENTIALS = {
 
 def linkedin_config(
     author: str = ORGANIZATION, credentials: dict[str, str] | None = None, **settings: Any
-) -> FleetConfig:
-    return FleetConfig.parse(
+) -> ContavexConfig:
+    return ContavexConfig.parse(
         {
             "consumers": {"tester": {"api_key": "consumer_key"}},
             "service": {"master_key": "master_key"},

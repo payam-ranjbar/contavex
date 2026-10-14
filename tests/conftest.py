@@ -10,19 +10,19 @@ import httpx2
 import pytest
 import structlog
 
-from content_fleet.api.app import create_app
-from content_fleet.config import AccountConfig, FleetConfig, Settings
-from content_fleet.core.capabilities import Capabilities, KindCapability, MediaTypeCapability
-from content_fleet.core.models import (
+from contavex.api.app import create_app
+from contavex.config import AccountConfig, ContavexConfig, Settings
+from contavex.core.capabilities import Capabilities, KindCapability, MediaTypeCapability
+from contavex.core.models import (
     MediaSource,
     MediaType,
     PublicationRequest,
     PublicationResult,
     PublishedPost,
 )
-from content_fleet.providers.base import Done, Provider, ProviderContext, StepOutcome
-from content_fleet.providers.registry import ProviderRegistry
-from content_fleet.services import Services, build_services
+from contavex.providers.base import Done, Provider, ProviderContext, StepOutcome
+from contavex.providers.registry import ProviderRegistry
+from contavex.services import Services, build_services
 
 CONSUMER_KEY = "test-consumer-key-0123456789abcdef"
 OTHER_KEY = "other-consumer-key-0123456789abcdef"
@@ -153,8 +153,8 @@ def write_secrets(directory: Path, **values: str) -> None:
         (directory / name).write_text(value, encoding="utf-8")
 
 
-def fleet_config(**account_settings: Any) -> FleetConfig:
-    return FleetConfig.parse(
+def contavex_config(**account_settings: Any) -> ContavexConfig:
+    return ContavexConfig.parse(
         {
             "consumers": {
                 "tester": {"api_key": "consumer_key"},
@@ -182,7 +182,7 @@ async def harness_factory(tmp_path: Path) -> AsyncIterator[HarnessFactory]:
 
         async def build(
             *,
-            config: FleetConfig | None = None,
+            config: ContavexConfig | None = None,
             registry: ProviderRegistry | None = None,
             transport: httpx2.AsyncBaseTransport | None = None,
             secrets: dict[str, str] | None = None,
@@ -208,7 +208,7 @@ async def harness_factory(tmp_path: Path) -> AsyncIterator[HarnessFactory]:
             clock = FakeClock()
             services = build_services(
                 resolved,
-                config=config or fleet_config(),
+                config=config or contavex_config(),
                 # A custom config gets the real providers unless told otherwise.
                 registry=registry or (ProviderRegistry([provider]) if config is None else None),
                 transport=transport,
@@ -218,7 +218,7 @@ async def harness_factory(tmp_path: Path) -> AsyncIterator[HarnessFactory]:
             client = await stack.enter_async_context(
                 httpx2.AsyncClient(
                     transport=httpx2.ASGITransport(app=create_app(services, start_worker=False)),
-                    base_url="http://fleet",
+                    base_url="http://contavex",
                 )
             )
             return Harness(services, client, provider, clock, secrets_dir)

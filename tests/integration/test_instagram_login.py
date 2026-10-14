@@ -11,10 +11,10 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import ConfigError, FleetConfig
-from content_fleet.credentials import CredentialStore
-from content_fleet.observability import configure_logging
-from content_fleet.secrets import FileSecretResolver
+from contavex.config import ConfigError, ContavexConfig
+from contavex.credentials import CredentialStore
+from contavex.observability import configure_logging
+from contavex.secrets import FileSecretResolver
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes.instagram import (
     EXPIRES_IN,
@@ -34,7 +34,7 @@ VIDEO = {"type": "video", "url": "https://cdn.example.com/a.mp4"}
 DAY = 86400
 
 
-def instagram_config(*, staging: bool = True, master_key: bool = True) -> FleetConfig:
+def instagram_config(*, staging: bool = True, master_key: bool = True) -> ContavexConfig:
     raw: dict[str, Any] = {
         "consumers": {"tester": {"api_key": "consumer_key"}, "other": {"api_key": "other_key"}},
         "accounts": {
@@ -53,7 +53,7 @@ def instagram_config(*, staging: bool = True, master_key: bool = True) -> FleetC
             "strategy": "self-hosted",
             "settings": {"public_base_url": "https://media.test"},
         }
-    return FleetConfig.parse(raw)
+    return ContavexConfig.parse(raw)
 
 
 SECRETS = {"ig_token": TOKEN, "master_key": MASTER_KEY}

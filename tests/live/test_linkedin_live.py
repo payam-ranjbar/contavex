@@ -2,9 +2,9 @@
 then deletes. It also settles an open research question: whether a
 self-serve "Share on LinkedIn" app may call the versioned /rest/posts API.
 
-    $env:CF_LIVE_TESTS = "1"
-    $env:CF_LIVE_LINKEDIN_TOKEN_FILE = "secrets\\linkedin_founder_access_token"
-    $env:CF_LIVE_LINKEDIN_AUTHOR = "urn:li:person:..."     # or urn:li:organization:...
+    $env:CONTAVEX_LIVE_TESTS = "1"
+    $env:CONTAVEX_LIVE_LINKEDIN_TOKEN_FILE = "secrets\\linkedin_founder_access_token"
+    $env:CONTAVEX_LIVE_LINKEDIN_AUTHOR = "urn:li:person:..."     # or urn:li:organization:...
     uv run pytest -m live tests/live/test_linkedin_live.py -s
 """
 
@@ -16,14 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from content_fleet.config import FleetConfig
+from contavex.config import ContavexConfig
 from tests.conftest import Harness, HarnessFactory
 
 pytestmark = [
     pytest.mark.live,
     pytest.mark.anyio,
     pytest.mark.skipif(
-        os.environ.get("CF_LIVE_TESTS") != "1", reason="live tests need CF_LIVE_TESTS=1"
+        os.environ.get("CONTAVEX_LIVE_TESTS") != "1", reason="live tests need CONTAVEX_LIVE_TESTS=1"
     ),
 ]
 
@@ -34,11 +34,11 @@ def _read(path: str) -> str:
 
 @pytest.fixture
 async def h(harness_factory: HarnessFactory) -> Harness:
-    token_file = os.environ.get("CF_LIVE_LINKEDIN_TOKEN_FILE")
-    author = os.environ.get("CF_LIVE_LINKEDIN_AUTHOR")
+    token_file = os.environ.get("CONTAVEX_LIVE_LINKEDIN_TOKEN_FILE")
+    author = os.environ.get("CONTAVEX_LIVE_LINKEDIN_AUTHOR")
     if not token_file or not author:
-        pytest.skip("set CF_LIVE_LINKEDIN_TOKEN_FILE and CF_LIVE_LINKEDIN_AUTHOR")
-    config = FleetConfig.parse(
+        pytest.skip("set CONTAVEX_LIVE_LINKEDIN_TOKEN_FILE and CONTAVEX_LIVE_LINKEDIN_AUTHOR")
+    config = ContavexConfig.parse(
         {
             "consumers": {"tester": {"api_key": "consumer_key"}},
             "service": {"master_key": "master_key"},
@@ -63,7 +63,7 @@ async def h(harness_factory: HarnessFactory) -> Harness:
 
 async def test_publish_edit_delete_round_trip(h: Harness) -> None:
     response = await h.submit(
-        text="content-fleet live test (will be deleted) #test",
+        text="contavex live test (will be deleted) #test",
         options={"linkedin": {"visibility": "CONNECTIONS"}},
         key="live-1",
     )

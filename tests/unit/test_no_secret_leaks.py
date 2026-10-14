@@ -8,8 +8,8 @@ import sqlite3
 
 import pytest
 
-from content_fleet.core.errors import ErrorCategory, PublishError
-from content_fleet.observability import configure_logging
+from contavex.core.errors import ErrorCategory, PublishError
+from contavex.observability import configure_logging
 from tests.conftest import CANARY_TOKEN, CONSUMER_KEY, Harness
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]

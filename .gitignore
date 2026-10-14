@@ -44,6 +44,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Operator-specific; config/fleet.example.toml is the tracked template.
-/config/fleet.toml
+# Operator-specific; config/contavex.example.toml is the tracked template.
+/config/contavex.toml
 /compose.local.yaml

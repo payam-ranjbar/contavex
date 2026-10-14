@@ -501,7 +501,7 @@ Attempted, not retrievable (404), nothing used from them
 
 ## Implementation in this service
 
-Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/instagram/instagram_login.py`.
+Added 2026-10-09, after the research above. Code: `src/contavex/providers/instagram/instagram_login.py`.
 
 | Topic | What the implementation does |
 | --- | --- |

@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from content_fleet.core.errors import ErrorCategory, PublishError
-from content_fleet.providers.base import Continue, ProviderContext, StepOutcome, Unknown
-from content_fleet.worker import BACKOFF_CAP_SECONDS, backoff_seconds
+from contavex.core.errors import ErrorCategory, PublishError
+from contavex.providers.base import Continue, ProviderContext, StepOutcome, Unknown
+from contavex.worker import BACKOFF_CAP_SECONDS, backoff_seconds
 from tests.conftest import Harness, HarnessFactory, published
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]

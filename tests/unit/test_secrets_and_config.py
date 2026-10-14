@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from content_fleet.config import ConfigError, FleetConfig, Settings
-from content_fleet.providers.registry import ProviderRegistry
-from content_fleet.secrets import FileSecretResolver, Redactor, Secret, SecretError
-from content_fleet.services import build_services
-from tests.conftest import ScriptedProvider, fleet_config, write_secrets
+from contavex.config import ConfigError, ContavexConfig, Settings
+from contavex.providers.registry import ProviderRegistry
+from contavex.secrets import FileSecretResolver, Redactor, Secret, SecretError
+from contavex.services import build_services
+from tests.conftest import ScriptedProvider, contavex_config, write_secrets
 
 pytestmark = pytest.mark.unit
 
@@ -74,19 +74,21 @@ class TestRedactor:
 
 
 class TestSettings:
-    def test_reads_cf_prefixed_environment(self) -> None:
-        settings = Settings.from_env({"CF_PORT": "9000", "CF_DATA_DIR": "/x", "PORT": "1"})
+    def test_reads_contavex_prefixed_environment(self) -> None:
+        settings = Settings.from_env(
+            {"CONTAVEX_PORT": "9000", "CONTAVEX_DATA_DIR": "/x", "PORT": "1"}
+        )
         assert settings.port == 9000
-        assert settings.db_path == Path("/x/content_fleet.db")
+        assert settings.db_path == Path("/x/contavex.db")
 
     def test_rejects_bad_values(self) -> None:
         with pytest.raises(ConfigError):
-            Settings.from_env({"CF_PORT": "not-a-port"})
+            Settings.from_env({"CONTAVEX_PORT": "not-a-port"})
 
 
-class TestFleetConfig:
+class TestContavexConfig:
     def test_loads_accounts_and_consumers(self, tmp_path: Path) -> None:
-        path = tmp_path / "fleet.toml"
+        path = tmp_path / "contavex.toml"
         path.write_text(
             """
             [consumers.app]
@@ -99,7 +101,7 @@ class TestFleetConfig:
             settings = { chat_id = "-1001" }
             """
         )
-        config = FleetConfig.load(path)
+        config = ContavexConfig.load(path)
         assert config.accounts["news"].credentials == {"token": "telegram_news_bot_token"}
         assert config.accounts["news"].settings == {"chat_id": "-1001"}
 
@@ -115,11 +117,11 @@ class TestFleetConfig:
     )
     def test_rejects_invalid_config(self, raw: dict[str, object]) -> None:
         with pytest.raises(ConfigError):
-            FleetConfig.parse(raw)
+            ContavexConfig.parse(raw)
 
     def test_missing_file(self, tmp_path: Path) -> None:
         with pytest.raises(ConfigError, match="not found"):
-            FleetConfig.load(tmp_path / "nope.toml")
+            ContavexConfig.load(tmp_path / "nope.toml")
 
 
 class TestStartupFailsFast:
@@ -131,21 +133,21 @@ class TestStartupFailsFast:
         with pytest.raises(SecretError, match="fake_token"):
             build_services(
                 self._settings(tmp_path),
-                config=fleet_config(),
+                config=contavex_config(),
                 registry=ProviderRegistry([ScriptedProvider()]),
             )
 
     def test_account_without_a_provider(self, tmp_path: Path) -> None:
         with pytest.raises(ConfigError, match="no provider for platform 'fake'"):
             build_services(
-                self._settings(tmp_path), config=fleet_config(), registry=ProviderRegistry()
+                self._settings(tmp_path), config=contavex_config(), registry=ProviderRegistry()
             )
 
     def test_account_settings_rejected_by_provider(self, tmp_path: Path) -> None:
         with pytest.raises(ConfigError, match=r"settings.broken"):
             build_services(
                 self._settings(tmp_path),
-                config=fleet_config(broken=True),
+                config=contavex_config(broken=True),
                 registry=ProviderRegistry([ScriptedProvider()]),
             )
 

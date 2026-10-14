@@ -1,4 +1,4 @@
-# Content Fleet
+# Contavex
 
 A Dockerized service that publishes social-media content to Telegram,
 Instagram and LinkedIn behind one HTTP contract. Consuming applications
@@ -43,10 +43,10 @@ Requirements: Docker with Compose. For development also
 [uv](https://docs.astral.sh/uv/) and Python 3.14.
 
 ```sh
-cp config/fleet.example.toml config/fleet.toml     # then edit: channel id, accounts
+cp config/contavex.example.toml config/contavex.toml     # then edit: channel id, accounts
 ```
 
-Create each secret named in `config/fleet.toml` as a file in `secrets/`
+Create each secret named in `config/contavex.toml` as a file in `secrets/`
 (git-ignored), without a trailing newline:
 
 ```powershell
@@ -94,7 +94,7 @@ No review, no cost. You need a Telegram account and a channel you administer.
    `result.id`. For a private channel, post any message in it and open
    `https://api.telegram.org/bot<TOKEN>/getUpdates`; the id is
    `channel_post.chat.id`.
-5. In `config/fleet.toml`:
+5. In `config/contavex.toml`:
 
    ```toml
    [accounts.news-channel]
@@ -140,7 +140,7 @@ publish to an account you own.
    python -c "import os,base64;print(base64.b64encode(os.urandom(32)).decode(),end='')" > secrets/master_key
    ```
 
-7. In `config/fleet.toml`:
+7. In `config/contavex.toml`:
 
    ```toml
    [service]
@@ -155,7 +155,7 @@ publish to an account you own.
 
 8. Decide how uploaded files reach Instagram. Instagram downloads media
    from a public URL; it does not accept uploads. Choose one `[staging]`
-   strategy in `config/fleet.toml` (both are shown, commented, in the
+   strategy in `config/contavex.toml` (both are shown, commented, in the
    example file):
    - **`object-storage`**: an S3-compatible bucket (AWS S3, Cloudflare R2,
      MinIO, Backblaze B2). The bucket stays private; Instagram gets a link
@@ -223,7 +223,7 @@ reviews.
    `curl -H "Authorization: Bearer <TOKEN>" https://api.linkedin.com/v2/userinfo`
    and take `sub`. Your author is `urn:li:person:<sub>`.
 6. Create `secrets/master_key` as in Instagram step 6, and in
-   `config/fleet.toml`:
+   `config/contavex.toml`:
 
    ```toml
    [service]
@@ -369,7 +369,7 @@ Publication states:
 
 Errors are RFC 9457 problem documents (`application/problem+json`). The
 machine-readable contract is at `GET /openapi.json`, or without a running
-service: `uv run python -m content_fleet openapi`.
+service: `uv run python -m contavex openapi`.
 
 ## What each platform supports
 
@@ -400,23 +400,23 @@ docker compose -f compose.yaml -f compose.dev.yaml up --build   # also on 127.0.
 ```
 
 Other containers reach the service at `http://publisher:8080` by joining the
-`content-fleet` network:
+`contavex` network:
 
 ```yaml
 services:
   my-app:
-    networks: [content-fleet]
+    networks: [contavex]
 networks:
-  content-fleet:
+  contavex:
     external: true
 ```
 
-- Every secret named in `config/fleet.toml` must also be listed under
+- Every secret named in `config/contavex.toml` must also be listed under
   `secrets:` in `compose.yaml` (commented entries are provided). To keep
   machine-specific secrets out of the tracked file, put them in a git-ignored
   `compose.local.yaml` with the same structure and add `-f compose.local.yaml`.
 - The container runs as a non-root user with a read-only filesystem. The
-  `fleet-data` volume holds the publication history, uploaded media and
+  `contavex-data` volume holds the publication history, uploaded media and
   encrypted tokens: back it up, and back up `secrets/master_key` separately.
 - Port 8080 (the API) is never published by `compose.yaml`. Port 8081 exists
   only for the `self-hosted` staging strategy and must sit behind your HTTPS
@@ -427,23 +427,23 @@ Settings are environment variables, all optional:
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CF_PORT` | `8080` | API port |
-| `CF_PUBLIC_PORT` | `8081` | Public media listener (self-hosted staging only) |
-| `CF_DATA_DIR` | `/data` | Database and uploaded media |
-| `CF_CONFIG_FILE` | `/config/fleet.toml` | Accounts and consumers |
-| `CF_SECRETS_DIR` | `/run/secrets` | Where secret files are mounted |
-| `CF_LOG_LEVEL` | `INFO` | |
-| `CF_MAX_UPLOAD_BYTES` | 64 MiB | Largest accepted media upload |
-| `CF_MEDIA_RETENTION_SECONDS` | 48 h | How long an unused upload is kept |
-| `CF_MAX_ATTEMPTS` | `5` | Consecutive failed tries of a step before giving up |
-| `CF_PUBLICATION_DEADLINE_SECONDS` | 6 h | A publication not finished by then fails |
-| `CF_PROVIDER_TIMEOUT_SECONDS` | `120` | Limit for one vendor step |
+| `CONTAVEX_PORT` | `8080` | API port |
+| `CONTAVEX_PUBLIC_PORT` | `8081` | Public media listener (self-hosted staging only) |
+| `CONTAVEX_DATA_DIR` | `/data` | Database and uploaded media |
+| `CONTAVEX_CONFIG_FILE` | `/config/contavex.toml` | Accounts and consumers |
+| `CONTAVEX_SECRETS_DIR` | `/run/secrets` | Where secret files are mounted |
+| `CONTAVEX_LOG_LEVEL` | `INFO` | |
+| `CONTAVEX_MAX_UPLOAD_BYTES` | 64 MiB | Largest accepted media upload |
+| `CONTAVEX_MEDIA_RETENTION_SECONDS` | 48 h | How long an unused upload is kept |
+| `CONTAVEX_MAX_ATTEMPTS` | `5` | Consecutive failed tries of a step before giving up |
+| `CONTAVEX_PUBLICATION_DEADLINE_SECONDS` | 6 h | A publication not finished by then fails |
+| `CONTAVEX_PROVIDER_TIMEOUT_SECONDS` | `120` | Limit for one vendor step |
 
 Without Docker, for development:
 
 ```powershell
-$env:CF_DATA_DIR = ".\data"; $env:CF_CONFIG_FILE = ".\config\fleet.toml"; $env:CF_SECRETS_DIR = ".\secrets"
-uv run python -m content_fleet serve
+$env:CONTAVEX_DATA_DIR = ".\data"; $env:CONTAVEX_CONFIG_FILE = ".\config\contavex.toml"; $env:CONTAVEX_SECRETS_DIR = ".\secrets"
+uv run python -m contavex serve
 ```
 
 Logs are JSON lines on stdout with `request_id`, `publication_id`, `account`
@@ -489,9 +489,9 @@ With credentials in hand, in this order:
 1. **Telegram.** Follow [Telegram](#telegram) above, then:
 
    ```powershell
-   $env:CF_LIVE_TESTS = "1"
-   $env:CF_LIVE_TELEGRAM_TOKEN_FILE = "secrets\telegram_news_bot_token"
-   $env:CF_LIVE_TELEGRAM_CHAT_ID = "-100..."
+   $env:CONTAVEX_LIVE_TESTS = "1"
+   $env:CONTAVEX_LIVE_TELEGRAM_TOKEN_FILE = "secrets\telegram_news_bot_token"
+   $env:CONTAVEX_LIVE_TELEGRAM_CHAT_ID = "-100..."
    uv run pytest -m live tests/live/test_telegram_live.py -s
    ```
 
@@ -502,13 +502,13 @@ With credentials in hand, in this order:
 3. **LinkedIn.** `tests/live/test_linkedin_live.py` posts to connections
    only, edits and deletes.
 
-Live tests need both the `-m live` selection and `CF_LIVE_TESTS=1`, so they
+Live tests need both the `-m live` selection and `CONTAVEX_LIVE_TESTS=1`, so they
 cannot run by accident. Things only a live run can confirm are listed in
 [docs/RESEARCH.md](docs/RESEARCH.md) under "Unverified items".
 
 ## Extending
 
-**Add an account.** Add an `[accounts.<id>]` entry to `config/fleet.toml`,
+**Add an account.** Add an `[accounts.<id>]` entry to `config/contavex.toml`,
 create its secret file(s), list them in `compose.yaml`, restart.
 
 **Add a consumer.** Add `[consumers.<id>]` with the name of a new API-key
@@ -516,8 +516,8 @@ secret, create the secret, restart.
 
 **Add a platform, or a second implementation of an existing platform.**
 
-1. Write a subclass of `Provider` (`src/content_fleet/providers/base.py`) in
-   `src/content_fleet/providers/<platform>/<implementation>.py`. Declare
+1. Write a subclass of `Provider` (`src/contavex/providers/base.py`) in
+   `src/contavex/providers/<platform>/<implementation>.py`. Declare
    `capabilities`; implement `advance` one step at a time; classify failures
    with `PublishError`; return `Unknown` when a post may have been created
    but cannot be confirmed. `telegram/bot_api.py` is the simplest reference,
@@ -530,7 +530,7 @@ secret, create the secret, restart.
 4. Point an account at it with `platform` / `implementation`. Consumers
    address accounts, so nothing changes for them.
 
-**Add a staging strategy.** Subclass `Stager` (`src/content_fleet/staging/`)
+**Add a staging strategy.** Subclass `Stager` (`src/contavex/staging/`)
 and list it in `staging/registry.py`.
 
 ## Documents

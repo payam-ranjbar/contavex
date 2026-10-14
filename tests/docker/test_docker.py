@@ -19,7 +19,7 @@ pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
-IMAGE = "content-fleet:test"
+IMAGE = "contavex:test"
 CANARY = "CANARY-secret-that-must-never-be-in-an-image-7f3a9c"
 BOT_TOKEN = "424242424:DOCKERsmokeDOCKERsmokeDOCKERsmokeDOCKER"
 CONSUMER_KEY = "smoke-consumer-key-0123456789abcdef"
@@ -72,7 +72,7 @@ def stack(image: str, tmp_path_factory: pytest.TempPathFactory) -> Iterator[Stac
     (fixtures / "secrets").mkdir()
     (fixtures / "secrets" / "consumer_api_key_demo").write_text(CONSUMER_KEY + "\n")
     (fixtures / "secrets" / "telegram_news_bot_token").write_text(BOT_TOKEN)
-    (fixtures / "fleet.toml").write_text(
+    (fixtures / "contavex.toml").write_text(
         """
 [consumers.demo-app]
 api_key = "consumer_api_key_demo"
@@ -123,7 +123,7 @@ class TestImage:
                 assert word not in text.upper().replace("/RUN/SECRETS", "")
         assert config["User"] == "10001:10001"
         assert config["Healthcheck"]["Test"][:2] == ["CMD", "python"]
-        assert config["Entrypoint"] == ["python", "-m", "content_fleet"]
+        assert config["Entrypoint"] == ["python", "-m", "contavex"]
 
     def test_image_has_no_tests_docs_or_local_files(self, image: str) -> None:
         listing = run(

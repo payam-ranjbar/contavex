@@ -17,7 +17,7 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import FleetConfig
+from contavex.config import ContavexConfig
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes import instagram as ig
 from tests.fakes import linkedin as li
@@ -212,7 +212,7 @@ def driver(request: pytest.FixtureRequest) -> Driver:
 
 @pytest.fixture
 async def h(harness_factory: HarnessFactory, driver: Driver) -> Harness:
-    config = FleetConfig.parse(
+    config = ContavexConfig.parse(
         {
             "consumers": {"tester": {"api_key": "consumer_key"}},
             "accounts": {

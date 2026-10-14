@@ -1,11 +1,11 @@
-# Consumers reach the service at http://publisher:8080 on the "content-fleet"
+# Consumers reach the service at http://publisher:8080 on the "contavex"
 # network. No host port is published here; see compose.dev.yaml for local use.
-name: content-fleet
+name: contavex
 
 services:
   publisher:
     build: .
-    image: content-fleet:local
+    image: contavex:local
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
@@ -18,11 +18,11 @@ services:
     security_opt:
       - no-new-privileges:true
     environment:
-      CF_LOG_LEVEL: INFO
+      CONTAVEX_LOG_LEVEL: INFO
     volumes:
-      - fleet-data:/data
-      - ./config/fleet.toml:/config/fleet.toml:ro
-    # One entry per secret named in config/fleet.toml. Each is mounted
+      - contavex-data:/data
+      - ./config/contavex.toml:/config/contavex.toml:ro
+    # One entry per secret named in config/contavex.toml. Each is mounted
     # read-only at /run/secrets/<name> and never enters the environment.
     secrets:
       - consumer_api_key_demo
@@ -35,7 +35,7 @@ services:
       # - linkedin_client_id
       # - linkedin_client_secret
     networks:
-      - fleet
+      - contavex
     expose:
       - "8080"
     # Only for the "self-hosted" staging strategy: the public media listener.
@@ -44,13 +44,13 @@ services:
     #   - "127.0.0.1:8081:8081"
 
 networks:
-  fleet:
-    name: content-fleet
+  contavex:
+    name: contavex
 
 volumes:
   # Publication history, uploaded media and encrypted tokens. Back it up; do
   # not bind-mount it from a Windows path (SQLite needs real file locking).
-  fleet-data:
+  contavex-data:
 
 secrets:
   consumer_api_key_demo:

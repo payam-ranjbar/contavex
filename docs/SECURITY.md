@@ -71,7 +71,7 @@ Secrets are referenced by **name** in the account configuration, never by
 value:
 
 ```toml
-# config/fleet.toml — non-secret, safe to commit
+# config/contavex.toml — non-secret, safe to commit
 [accounts.news-channel]
 platform       = "telegram"
 implementation = "bot-api"

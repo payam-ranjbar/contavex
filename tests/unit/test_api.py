@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from content_fleet.core.errors import ErrorCategory, PublishError
+from contavex.core.errors import ErrorCategory, PublishError
 from tests.conftest import OTHER_KEY, Harness
 
 pytestmark = [pytest.mark.unit, pytest.mark.anyio]
@@ -31,7 +31,7 @@ class TestAuthentication:
             response = await harness.client.request(method, path, headers=headers, json={})
             assert response.status_code == 401
             assert response.headers["content-type"] == PROBLEM
-            assert response.json()["type"] == "urn:content-fleet:problem:unauthenticated"
+            assert response.json()["type"] == "urn:contavex:problem:unauthenticated"
 
     async def test_health_endpoints_need_no_key(self, harness: Harness) -> None:
         assert (await harness.client.get("/livez")).status_code == 200

@@ -506,7 +506,7 @@ Non-primary sources (search results only; used solely for the two items marked U
 
 ## Implementation in this service
 
-Added 2026-10-09. The onboarding and the two open questions were researched again before implementation; see `docs/research/testing-and-onboarding.md`, section B.3. Code: `src/content_fleet/providers/linkedin/rest.py`.
+Added 2026-10-09. The onboarding and the two open questions were researched again before implementation; see `docs/research/testing-and-onboarding.md`, section B.3. Code: `src/contavex/providers/linkedin/rest.py`.
 
 | Topic | What the implementation does |
 | --- | --- |

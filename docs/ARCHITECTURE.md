@@ -107,7 +107,7 @@ except the table.
 
 ### D-5 Media: consumers upload to the service; public staging is a strategy — *decided by operator*
 
-The operator's media originates inside the fleet and is not publicly hosted.
+The operator's media originates inside Contavex and is not publicly hosted.
 The first proposal (media by URL only) was therefore replaced.
 
 **Contract.** Media is a first-class resource:
@@ -226,7 +226,7 @@ the host.
 
 ### D-8 Accounts and consumer authentication
 
-- **Accounts** are declared in `config/fleet.toml` (non-secret, mounted read-only). Adding an account is: add an entry, add its secret file, restart. No admin API in the MVP.
+- **Accounts** are declared in `config/contavex.toml` (non-secret, mounted read-only). Adding an account is: add an entry, add its secret file, restart. No admin API in the MVP.
 - **Consumers** authenticate with a bearer API key per consumer; keys are secrets like any other. The consumer's name is recorded on each publication and in logs.
 
 ### D-9 Observability
@@ -315,7 +315,7 @@ consumers must ignore unknown fields; enumerations may grow.
 ### Repository layout
 
 ```
-src/content_fleet/
+src/contavex/
     api/app.py          routes, auth, problem details, idempotency
     core/               models, capabilities, error vocabulary
     providers/
@@ -337,7 +337,7 @@ tests/
     unit/  integration/  contract/  docker/  live/
     fakes/              stateful fakes of the three vendors
     fixtures/telegram/  Bot API field list the Telegram fake checks requests against
-config/fleet.example.toml
+config/contavex.example.toml
 secrets/*.example
 Dockerfile  compose.yaml  compose.dev.yaml
 ```

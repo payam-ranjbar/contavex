@@ -1,5 +1,5 @@
 [project]
-name = "content-fleet"
+name = "contavex"
 version = "0.1.0"
 description = "Dockerized service for publishing content to social platforms behind one contract"
 readme = "README.md"
@@ -27,7 +27,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/content_fleet"]
+packages = ["src/contavex"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -37,7 +37,7 @@ markers = [
     "integration: a provider implementation against a faked HTTP transport",
     "contract: one behavioural suite run against every provider implementation",
     "docker: builds and runs containers; needs a Docker daemon (opt-in: -m docker)",
-    "live: calls real vendor APIs with real credentials (opt-in: -m live and CF_LIVE_TESTS=1)",
+    "live: calls real vendor APIs with real credentials (opt-in: -m live and CONTAVEX_LIVE_TESTS=1)",
 ]
 filterwarnings = ["error"]
 

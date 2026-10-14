@@ -170,7 +170,7 @@ These are the facts the architecture depends on. Answers are recorded in
 
 | Date | Change | Reason |
 |---|---|---|
-| 2026-10-09 | **F-26 added:** consumers upload media files to the service; the service is responsible for getting them to each provider in the form that provider needs. | Operator: media originates in the fleet and is not publicly hosted. Research: Instagram needs a public URL; LinkedIn and Telegram need bytes. |
+| 2026-10-09 | **F-26 added:** consumers upload media files to the service; the service is responsible for getting them to each provider in the form that provider needs. | Operator: media originates in Contavex and is not publicly hosted. Research: Instagram needs a public URL; LinkedIn and Telegram need bytes. |
 | 2026-10-09 | **F-27 added:** making media publicly reachable ("staging") is a replaceable strategy — at least object storage/CDN and self-hosting — independent of the provider that needs it. | Operator decision. |
 | 2026-10-09 | **F-20 extended:** a publication can also end in *outcome unknown*. | Research: no provider offers idempotency keys; some lost responses cannot be reconciled. |
 | 2026-10-09 | **S-2 extended:** credentials that change at runtime are stored encrypted in a writable store, separate from injected secrets. | Research: Instagram and LinkedIn tokens are refreshed. Operator chose encryption. |

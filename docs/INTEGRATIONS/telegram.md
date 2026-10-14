@@ -330,7 +330,7 @@ Library state (not Telegram documentation):
 
 ## Implementation in this service
 
-Added 2026-10-09, after the research above. Code: `src/content_fleet/providers/telegram/bot_api.py`.
+Added 2026-10-09, after the research above. Code: `src/contavex/providers/telegram/bot_api.py`.
 
 | Topic | What the implementation does |
 | --- | --- |

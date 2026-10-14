@@ -10,9 +10,9 @@ from typing import Any
 import httpx2
 import pytest
 
-from content_fleet.config import ConfigError, FleetConfig
-from content_fleet.observability import configure_logging
-from content_fleet.providers.registry import default_registry
+from contavex.config import ConfigError, ContavexConfig
+from contavex.observability import configure_logging
+from contavex.providers.registry import default_registry
 from tests.conftest import Harness, HarnessFactory
 from tests.fakes.telegram import CHAT_ID, TOKEN, FakeTelegram, check_against_spec
 
@@ -21,8 +21,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 JPEG = b"\xff\xd8\xff\xe0 not really a jpeg"
 
 
-def telegram_config(**settings: Any) -> FleetConfig:
-    return FleetConfig.parse(
+def telegram_config(**settings: Any) -> ContavexConfig:
+    return ContavexConfig.parse(
         {
             "consumers": {"tester": {"api_key": "consumer_key"}, "other": {"api_key": "other_key"}},
             "accounts": {
@@ -86,9 +86,9 @@ class TestPublishing:
     async def test_public_channel_gets_a_public_link(
         self, h: Harness, telegram: FakeTelegram
     ) -> None:
-        telegram.username = "fleet_news"
+        telegram.username = "contavex_news"
         publication = await publish(h, text="hi")
-        assert publication["result"]["posts"][0]["url"] == "https://t.me/fleet_news/42"
+        assert publication["result"]["posts"][0]["url"] == "https://t.me/contavex_news/42"
 
     async def test_formatting_and_options(self, h: Harness, telegram: FakeTelegram) -> None:
         await publish(
@@ -263,7 +263,7 @@ class TestValidation:
     async def test_misconfigured_account_stops_startup(
         self, harness_factory: HarnessFactory, account: dict[str, Any]
     ) -> None:
-        config = FleetConfig.parse(
+        config = ContavexConfig.parse(
             {
                 "consumers": {"tester": {"api_key": "consumer_key"}},
                 "accounts": {
