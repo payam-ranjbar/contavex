@@ -1,9 +1,28 @@
 # Contavex
 
-A Dockerized service that publishes social-media content to Telegram,
-Instagram and LinkedIn behind one HTTP contract. Consuming applications
-upload media, submit a publication and poll its status. They never see a
-vendor API or a vendor credential.
+**A Dockerized content fleet: one adapter between your applications and
+every social platform.**
+
+Your applications speak a single HTTP API: upload media, submit a
+publication, poll its status. Contavex turns that into whatever each
+platform needs: its API, its authentication, its upload procedure, its
+media rules, its rate limits and its quirks. Applications never see a
+vendor API or a vendor credential, and they don't change when a platform,
+or the way Contavex talks to it, does.
+
+- **Platforms are plug-ins.** Each one is a module behind a common
+  interface; adding a platform, or a second way of reaching an existing
+  one, doesn't touch the API your applications use. See [Extending](#extending).
+- **Differences are stated, not hidden.** Each account publishes what it can
+  do (kinds of post, media types, limits, edit and delete), and a request it
+  can't honour is refused up front instead of being silently downgraded.
+- **Built for unreliable networks.** Idempotency keys, persisted
+  multi-step publishing, per-platform retry rules, and an explicit
+  "outcome unknown" state instead of accidental double posts.
+- **Credentials stay inside.** Secrets are mounted files, renewed tokens
+  are stored encrypted, and nothing secret reaches logs or responses.
+
+Platforms included today: **Telegram**, **Instagram** and **LinkedIn**.
 
 ## Status
 
@@ -21,7 +40,7 @@ Company Pages are not yet tested live. See [Go live](#go-live).
 | Service (API, worker, storage, secrets) | Done, tested |
 | Telegram (Bot API) | Done; tested against a fake and **live against a real channel** |
 | Instagram (Instagram Login) | Done; tested against a fake and **live against a real account** |
-| LinkedIn (REST API) | Done, tested against a fake |
+| LinkedIn (REST API) | Done; tested against a fake, and one live text post to a personal profile |
 | Media staging for Instagram (S3-compatible, or self-hosted) | Object storage verified live on Cloudflare R2, including Instagram fetching the expiring links. Self-hosted: tested against a fake only |
 | Docker image and Compose | Built and smoke-tested: a consumer container publishes through the service container |
 
