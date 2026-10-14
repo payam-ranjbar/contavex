@@ -12,8 +12,9 @@ verified against the real Bot API** (2026-10-10): text, photo, album,
 document, article with slideshow, edit and delete, through the Docker stack, to a real channel.
 **Instagram is verified against the real API too** (2026-10-11): image,
 carousel, reel, image story and video story, each uploaded to the service and
-staged on a private Cloudflare R2 bucket. **LinkedIn has not been run against
-a real account yet**: that needs credentials. See [Go live](#go-live).
+staged on a private Cloudflare R2 bucket. **LinkedIn** has published one connections-only
+text post to a personal profile through the service (2026-10-14); media and
+Company Pages are not yet tested live. See [Go live](#go-live).
 
 | Part | State |
 |---|---|

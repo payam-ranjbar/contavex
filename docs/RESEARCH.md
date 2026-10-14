@@ -232,3 +232,10 @@ fetcher accepts such a presigned URL is still open until the first publish.
 - After five publishes (image, carousel, reel, two stories) `quota_usage` read 4. Either one kind does not count or the counter lags; not investigated.
 
 Still unverified for Instagram: whether Development-mode posts are visible to the public (check the profile while logged out), the result of a second `media_publish` on a published container, and the real shapes of error responses.
+
+### Settled by live calls on 2026-10-14 (LinkedIn, personal profile)
+
+- A self-serve app (products: Share on LinkedIn; Sign In with LinkedIn using OpenID Connect) **can** create posts through the versioned `POST /rest/posts` with `LinkedIn-Version: 202609` (item 7). The answer was `201` with the post URN in `x-restli-id`, as documented. The legacy `/v2/ugcPosts` path is not needed.
+- `POST /oauth/v2/introspectToken` with the app's client id and secret works for a Token Generator token and returns `expires_at`; the service uses it to show the re-authorization date.
+- `GET /v2/userinfo` returned 403 for tokens carrying `openid` and `profile` for a while after the OpenID Connect product was added, then 200 with no change on the operator's side that we could see. Provisioning appears to lag; retry before debugging.
+- No refresh token was issued to this self-serve app, as the documentation said (item 8).
