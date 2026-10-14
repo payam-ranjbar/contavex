@@ -35,6 +35,8 @@ Live tests (`tests/live/`) post to real accounts and need `-m live` and
 - Unsupported requests are refused with 422 before any vendor call; capabilities are data in each provider's `capabilities()`.
 - Use `httpx2`, not `httpx`. No vendor SDKs. New dependencies need a reason in `docs/DEPENDENCIES.md`.
 - Commit per working milestone with tests green. Do not push or publish to real accounts without being asked.
+- **Never push container images** (no `docker push`, no registry login, no CI that publishes images). Images are built and run locally only.
+- Per-deployment setups live in `deployments/<name>/` (compose file + config, git-ignored, never committed). `deployments/shapurx/` runs the `shapurx` container on `127.0.0.1:8090` with the Telegram @shapurx and Instagram @shapurx1 accounts; start it with `docker compose -f deployments/shapurx/compose.yaml up --build -d`. Run only one container per set of credentials: two would both renew the same Instagram token.
 
 ## Environment notes
 
