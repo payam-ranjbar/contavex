@@ -60,6 +60,8 @@ class FakeLinkedIn:
     token_active: bool = True
     token_expires_at: int = 1_805_000_000
     grants_refresh_token: bool = True
+    # Live behaviour for self-serve shares: /rest/posts cannot delete them.
+    shares_need_v2_delete: bool = True
     _planned: dict[str, list[_Planned]] = field(default_factory=dict)
     _next_id: int = 6_844_785_523_593_134_080
 
@@ -107,7 +109,8 @@ class FakeLinkedIn:
             if request.headers.get("authorization") != f"Bearer {self.valid_token}":
                 return li_error(401, "The token used in the request has expired or been revoked")
             assert request.headers.get("x-restli-protocol-version") == "2.0.0"
-            if request.headers.get("linkedin-version") != self.version:
+            versioned = request.url.path.startswith("/rest/")
+            if versioned and request.headers.get("linkedin-version") != self.version:
                 return li_error(
                     426,
                     f"Requested version {request.headers.get('linkedin-version')} is not active",
@@ -143,6 +146,9 @@ class FakeLinkedIn:
             return operation, match.group(1)
         if path == "/rest/posts":
             return ("create_post" if request.method == "POST" else "list_posts"), ""
+        match = re.fullmatch(r"/v2/shares/(\d+)", path)
+        if match and request.method == "DELETE":
+            return "delete_share", f"urn:li:share:{match.group(1)}"
         match = re.fullmatch(r"/rest/posts/(.+)", path)
         assert match, f"unexpected path {path}"
         urn = unquote(match.group(1))
@@ -244,8 +250,17 @@ class FakeLinkedIn:
             return li_error(404, "Post not found", "NOT_FOUND")
 
         if operation == "delete_post":
+            if target.startswith("urn:li:share:") and self.shares_need_v2_delete:
+                # What LinkedIn answered on 2026-10-14 for a share made by a
+                # self-serve app, while the post was still up.
+                return li_error(404, "Could not find entity", "NOT_FOUND")
             self.posts = [post for post in self.posts if post["id"] != target]
             return httpx2.Response(204)  # deletion is idempotent at LinkedIn
+
+        if operation == "delete_share":
+            before = len(self.posts)
+            self.posts = [post for post in self.posts if post["id"] != target]
+            return httpx2.Response(200 if len(self.posts) < before else 404)
 
         if operation == "refresh_token":
             assert body["client_id"] == CLIENT_ID and body["client_secret"] == CLIENT_SECRET

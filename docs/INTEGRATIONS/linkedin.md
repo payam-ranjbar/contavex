@@ -520,3 +520,7 @@ Added 2026-10-09. The onboarding and the two open questions were researched agai
 | Token expiry | With a refresh token: renewed when under 14 days are left. Without: the expiry date is read by token introspection and shown on the account |
 | Not implemented | Articles/link posts, polls, reshares, targeting, video captions and thumbnails, the interactive OAuth flow itself (tokens are obtained with LinkedIn's Token Generator) |
 | Checked how | A stateful fake of the REST API, OAuth endpoints and upload host. Not yet run against LinkedIn itself |
+
+### Live correction, 2026-10-14
+
+Deleting a `urn:li:share` created by a self-serve app through `DELETE /rest/posts/{urn}` returned 404 while the post existed; `DELETE https://api.linkedin.com/v2/shares/{id}` (no `LinkedIn-Version` header) deleted it with 200. The implementation now uses that fallback for shares, and no longer treats a 404 from `/rest/posts` as success.

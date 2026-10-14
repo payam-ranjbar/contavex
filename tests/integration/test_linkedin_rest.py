@@ -527,13 +527,31 @@ class TestEditAndDelete:
         assert (await h.client.delete(url, headers=h.auth())).status_code == 200
         assert linkedin.count("delete_post") == 1
 
-    async def test_delete_of_a_post_already_gone_succeeds(
+    async def test_share_that_rest_posts_cannot_find_is_deleted_through_v2_shares(
+        self, h: Harness, linkedin: FakeLinkedIn
+    ) -> None:
+        """Observed live: DELETE /rest/posts answered 404 for a share that was
+        still up. Trusting that 404 left a real post on the profile."""
+        publication = await publish(h, text="x")
+        assert publication["result"]["posts"][0]["id"].startswith("urn:li:share:")
+        response = await h.client.delete(f"/v1/publications/{publication['id']}", headers=h.auth())
+
+        assert response.json()["status"] == "deleted"
+        assert linkedin.operations()[-2:] == ["delete_post", "delete_share"]
+        assert linkedin.posts == []
+
+    async def test_ugc_post_not_found_is_not_reported_as_deleted(
         self, h: Harness, linkedin: FakeLinkedIn
     ) -> None:
         publication = await publish(h, text="x")
-        linkedin.plan("delete_post", li_error(404, "Not found", "NOT_FOUND"))
+        record = h.services.db.get_publication(publication["id"])
+        assert record is not None and record.result is not None
+        record.result.posts[0].id = "urn:li:ugcPost:123"
+        h.services.db.finish(record.id, now=h.clock(), status=record.status, result=record.result)
+        linkedin.plan("delete_post", li_error(404, "Could not find entity", "NOT_FOUND"))
         response = await h.client.delete(f"/v1/publications/{publication['id']}", headers=h.auth())
-        assert response.json()["status"] == "deleted"
+        assert response.status_code == 502
+        assert (await h.status(publication["id"]))["status"] == "published"
 
     async def test_failed_edit_is_a_problem_document(
         self, h: Harness, linkedin: FakeLinkedIn

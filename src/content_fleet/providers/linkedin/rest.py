@@ -491,17 +491,43 @@ class LinkedInRest(Provider):
     async def delete(self, ctx: ProviderContext, result: PublicationResult) -> None:
         if not result.posts:
             raise PublishError(ErrorCategory.UNSUPPORTED, "LinkedIn returned no post id to delete")
+        urn = result.posts[0].id
         try:
             await self._raw(
                 ctx,
                 "DELETE",
-                f"/rest/posts/{quote(result.posts[0].id, safe='')}",
+                f"/rest/posts/{quote(urn, safe='')}",
                 "delete_post",
                 headers={"X-RestLi-Method": "DELETE"},
             )
+            return
         except PublishError as exc:
-            if exc.provider_code != "404":  # already gone is what was asked for
+            if exc.provider_code != "404" or not urn.startswith("urn:li:share:"):
                 raise
+        # Observed live on 2026-10-14: for a `urn:li:share` created by a
+        # self-serve app, DELETE /rest/posts answers 404 "Could not find
+        # entity" while the post is still up, and DELETE /v2/shares/{id}
+        # removes it. A 404 here therefore does NOT mean "already gone".
+        await self._delete_share(ctx, urn.removeprefix("urn:li:share:"))
+
+    async def _delete_share(self, ctx: ProviderContext, share_id: str) -> None:
+        base = str(ctx.account.settings.get("api_base", DEFAULT_API_BASE)).rstrip("/")
+        response = await http.send(
+            ctx.http,
+            "DELETE",
+            f"{base}/v2/shares/{quote(share_id, safe='')}",
+            vendor="LinkedIn",
+            operation="delete_share",
+            headers={
+                "authorization": f"Bearer {ctx.credentials['access_token'].reveal()}",
+                "x-restli-protocol-version": "2.0.0",
+            },
+        )
+        log.info("linkedin_request", operation="delete_share", status=response.status_code)
+        if response.status_code == 404:
+            return  # the shares endpoint knows the post; not found there means gone
+        if response.status_code >= 300:
+            raise _classify(response)
 
     # ---------------------------------------------------------------- credentials
 
