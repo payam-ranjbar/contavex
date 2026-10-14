@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Dockerized service for publishing content to social platforms behind one contract"
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
 # Exact pins; rationale for each is in docs/DEPENDENCIES.md.
 dependencies = [
     "fastapi==0.143.0",

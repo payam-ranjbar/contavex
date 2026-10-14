@@ -544,3 +544,11 @@ and list it in `staging/registry.py`.
 | [docs/SECURITY.md](docs/SECURITY.md) | Secret lifecycle, injection, redaction, rotation |
 | [docs/INTEGRATIONS/](docs/INTEGRATIONS/) | Per-platform research: Telegram, Instagram, LinkedIn |
 | [docs/research/](docs/research/) | Detailed research notes and full source lists |
+
+## License
+
+[MIT](LICENSE) © 2026 Payam Ranjbar.
+
+`tests/fixtures/telegram/bot_api_spec.json` is derived from
+[telegram-bot-api-spec](https://github.com/PaulSonOfLars/telegram-bot-api-spec)
+© 2020 Paul Larsen, also under the MIT licence.
