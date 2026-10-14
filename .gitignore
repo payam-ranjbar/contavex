@@ -47,3 +47,6 @@ Thumbs.db
 # Operator-specific; config/contavex.example.toml is the tracked template.
 /config/contavex.toml
 /compose.local.yaml
+
+# Per-deployment configuration (account ids, secret references). Local only.
+/deployments/
